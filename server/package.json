@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@prisma/adapter-neon": "^6.17.1",
     "@prisma/client": "^6.17.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
