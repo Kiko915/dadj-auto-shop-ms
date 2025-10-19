@@ -1,11 +1,14 @@
-<script setup></script>
-
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <div id="app">
+    <h1>Project Initial Checkup</h1>
+    
+    <FSSmokeTest />
+
+    <router-view></router-view>
+  </div>
 </template>
 
-<style scoped></style>
+<script setup>
+// Assuming you have this component in the correct path
+import FSSmokeTest from './components/FSSmokeTest.vue';
+</script>

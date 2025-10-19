@@ -1,20 +1,33 @@
 {
   "name": "dadj-ms-server",
   "version": "0.1.0",
+  "description": "Node.js/Express API for the System, using Prisma and NeonDB adapter.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    
+    "prisma:migrate": "npx prisma migrate dev --name",
+    "prisma:generate": "npx prisma generate",
+    
+    "postinstall": "npm run prisma:generate" 
   },
-  "keywords": [],
+  "keywords": [
+    "node",
+    "express",
+    "prisma",
+    "neon",
+    "postgresql"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
-    "@prisma/adapter-neon": "^6.17.1",
-    "@prisma/client": "^6.17.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "@prisma/adapter-neon": "^6.17.1", 
+    "@prisma/client": "^6.17.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
