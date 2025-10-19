@@ -1,6 +1,6 @@
 {
-  "name": "-client-dadj-ms",
-  "version": "0.0.0",
+  "name": "dadj-ms-client",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
