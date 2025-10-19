@@ -1,4 +1,6 @@
-![DADJ-MS Project Vision](https://i.ibb.co/N2T7K2R3/5.png)
+<p align="center">
+  <img src="https://i.ibb.co/N2T7K2R3/5.png" alt="DADJ-MS Project Vision">
+</p>
 
 # Dad J’s Auto Shop (DADJ-MS) Management System
 
