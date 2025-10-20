@@ -1,26 +1,60 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken'
 import prisma from '../db.js';
 
 const router = express.Router();
 
 /**
  * @route POST /api/auth/login
- * @description User login
+ * @description Authenticates a user by verifying credentials and issues a JWT.
  * @access Public
- * TODO: Implement by team member
+ * @body {string} email - User's Email
+ * @body {string} password - User's Password
+ * @returns {object} 200 - On success, returns a success message and the JWT.
+ * @returns {object} 400 - If Email and Password are not provided
+ * @returns {object} 401 - If credentials are invalid (user not found or password mismatch)
+ * @returns {object} 500 - If an internal server error occurs
+ * TODO: Implement by Aron Ogayon
  */
 router.post('/login', async (req, res) => {
     try {
         // TODO: Implement login logic
         // 1. Validate email and password
-        // 2. Check user exists in database
-        // 3. Verify password hash
-        // 4. Generate JWT token
-        // 5. Return user data and token
+        const { email, password } = req.body
+
+        // Validate Input
+        if (!email || !password) {
+            return res.status(400).json({message: 'Email and Password are required'});
+        }
         
-        res.status(501).json({
-            message: 'Login endpoint not implemented yet',
-            todo: 'Team member needs to implement authentication logic'
+        // 2. Check user exists in database
+        const user = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        // Check if the user exist
+        if (!user) {
+            return res.status(401).json({message: 'Invalid Email or Password'});
+        }
+        
+        // 3. Verify password hash
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({message: 'Invalid Email or Password'});
+        }
+
+        // 4. Generate JWT token
+        const token = jwt.sign(
+            { userId: user.id },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' },
+        )
+
+        // 5. Return user data and token
+        res.status(200).json({
+            message: 'Login Success',
+            token: token,
         });
     } catch (error) {
         console.error('Login error:', error);
