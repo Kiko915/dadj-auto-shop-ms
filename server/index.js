@@ -6,6 +6,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js'; // Note the .js extension is often required for ESM
+import authRoutes from './routes/auth.js';
 
 // --- Initialization ---
 const app = express();
@@ -31,6 +32,7 @@ app.use(express.json());
 
 // 3. Define Main API Routes
 app.use('/api', apiRoutes); 
+app.use('/api/auth', authRoutes); 
 
 // 4. Root Route (Simple Check)
 app.get('/', (req, res) => {
