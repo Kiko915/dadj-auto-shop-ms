@@ -1,19 +1,142 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { authAPI } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Info } from 'lucide-vue-next'
+import { Info, Eye, EyeOff, AlertCircle, Loader2, CheckCircle } from 'lucide-vue-next'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
+const isLoading = ref(false)
+const isLoginSuccess = ref(false)
 
-const handleLogin = () => {
-  // TODO: Implement login logic
-  console.log('Login with:', email.value, password.value)
+// Validation state
+const emailError = ref('')
+const passwordError = ref('')
+const formError = ref('')
+
+// Email validation
+const validateEmail = () => {
+  emailError.value = ''
+  
+  if (!email.value) {
+    emailError.value = 'Email is required'
+    return false
+  }
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email.value)) {
+    emailError.value = 'Please enter a valid email address'
+    return false
+  }
+  
+  return true
+}
+
+// Password validation
+const validatePassword = () => {
+  passwordError.value = ''
+  
+  if (!password.value) {
+    passwordError.value = 'Password is required'
+    return false
+  }
+  
+  if (password.value.length < 6) {
+    passwordError.value = 'Password must be at least 6 characters long'
+    return false
+  }
+  
+  return true
+}
+
+// Form validation
+const isFormValid = computed(() => {
+  return email.value && password.value && !emailError.value && !passwordError.value
+})
+
+// Clear errors when user types
+const onEmailInput = () => {
+  if (emailError.value) {
+    emailError.value = ''
+  }
+  if (formError.value) {
+    formError.value = ''
+  }
+}
+
+const onPasswordInput = () => {
+  if (passwordError.value) {
+    passwordError.value = ''
+  }
+  if (formError.value) {
+    formError.value = ''
+  }
+}
+
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
+
+const handleLogin = async () => {
+  // Clear previous errors
+  formError.value = ''
+  
+  // Validate form
+  const isEmailValid = validateEmail()
+  const isPasswordValid = validatePassword()
+  
+  if (!isEmailValid || !isPasswordValid) {
+    return
+  }
+  
+  isLoading.value = true
+  
+  try {
+    // Make API call to backend using authAPI service
+    const data = await authAPI.login(email.value, password.value)
+    
+    // Success - store token and redirect
+    if (data.token) {
+      // Use auth store to manage authentication
+      authStore.login(data.token, email.value)
+      
+      // Show success indicator
+      isLoginSuccess.value = true
+      console.log('Login successful:', data.message)
+      
+      // Redirect to dashboard after a brief delay
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
+    } else {
+      throw new Error('No authentication token received')
+    }
+    
+  } catch (error) {
+    console.error('Login error:', error)
+    
+    // Handle axios errors
+    if (error.response) {
+      // Server responded with error status
+      formError.value = error.response.data.message || 'Login failed. Please try again.'
+    } else if (error.request) {
+      // Request was made but no response received
+      formError.value = 'Unable to connect to server. Please check your connection.'
+    } else {
+      // Something else happened
+      formError.value = error.message || 'Login failed. Please try again.'
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -27,7 +150,7 @@ const handleLogin = () => {
       </div>
 
       <!-- Content -->
-      <div class="relative z-10 flex flex-col mt-36 px-[100px]">
+      <div class="relative z-10 flex flex-col mt-30 px-[100px]">
         <h2 class="text-white text-4xl font-light mb-4">
           Customized Workflow
         </h2>
@@ -50,6 +173,15 @@ const handleLogin = () => {
     <!-- Right Panel - Login Form -->
     <div class="flex-1 flex items-center justify-center px-8">
       <div class="w-full max-w-[544px] space-y-6">
+        <!-- Mobile Logo (shown only on smaller screens) -->
+        <div class="lg:hidden flex justify-center mb-8">
+          <img 
+            src="/logo/symbol_w_wordmark_primary.png" 
+            alt="Dad-J Auto Shop" 
+            class="h-20 w-auto"
+          />
+        </div>
+
         <!-- Welcome Header -->
         <div class="space-y-2">
           <h1 class="text-[32px] font-normal text-[#424242]">
@@ -69,9 +201,17 @@ const handleLogin = () => {
               v-model="email"
               type="email"
               placeholder="synera@gmail.com"
-              class="h-[49px] rounded-lg border-[#e5e5e5] text-sm"
+              :class="[
+                'rounded-lg text-sm transition-colors',
+                emailError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-[#e5e5e5] focus:border-[#000080] focus:ring-[#000080]'
+              ]"
+              @input="clearEmailError"
+              @blur="validateEmail"
               required
             />
+            <p v-if="emailError" class="text-sm text-red-500 mt-1">
+              {{ emailError }}
+            </p>
           </div>
 
           <!-- Password Field -->
@@ -87,22 +227,58 @@ const handleLogin = () => {
                 Forgot Password?
               </a>
             </div>
-            <Input
-              id="password"
-              v-model="password"
-              type="password"
-              placeholder="****************"
-              class="h-[49px] rounded-lg border-[#e5e5e5] text-sm"
-              required
-            />
+            <div class="relative">
+              <Input
+                id="password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="****************"
+                :class="[
+                  'rounded-lg text-sm pr-10 transition-colors',
+                  passwordError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-[#e5e5e5] focus:border-[#000080] focus:ring-[#000080]'
+                ]"
+                @input="clearPasswordError"
+                @blur="validatePassword"
+                required
+              />
+              <button
+                type="button"
+                @click="togglePasswordVisibility"
+                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#737373] hover:text-[#0a0a0a] transition-colors"
+              >
+                <Eye v-if="!showPassword" class="h-4 w-4" />
+                <EyeOff v-else class="h-4 w-4" />
+              </button>
+            </div>
+            <p v-if="passwordError" class="text-sm text-red-500 mt-1">
+              {{ passwordError }}
+            </p>
           </div>
+
+          <!-- General Error Display -->
+          <Alert v-if="formError" variant="destructive" class="border-red-200 bg-red-50">
+            <AlertCircle class="h-4 w-4" />
+            <AlertDescription class="text-sm">
+              {{ formError }}
+            </AlertDescription>
+          </Alert>
+
+          <!-- Success Display -->
+          <Alert v-if="isLoginSuccess" class="border-green-200 bg-green-50">
+            <CheckCircle class="h-4 w-4 text-green-600" />
+            <AlertDescription class="text-sm text-green-800">
+              Login successful! Redirecting to dashboard...
+            </AlertDescription>
+          </Alert>
 
           <!-- Login Button -->
           <Button
             type="submit"
-            class="w-full h-[49px] bg-[#000080] hover:bg-[#000066] text-white rounded-lg font-medium text-sm"
+            :disabled="isLoading || !isFormValid"
+            class="w-full bg-[#000080] hover:bg-[#000066] disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm flex items-center justify-center"
           >
-            Log In
+            <Loader2 v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
+            {{ isLoading ? 'Logging in...' : 'Log In' }}
           </Button>
 
           <!-- Account Creation Alert -->

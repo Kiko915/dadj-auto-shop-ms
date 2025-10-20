@@ -64,6 +64,65 @@ router.post('/login', async (req, res) => {
 });
 
 /**
+ * @route POST /api/auth/logout
+ * @description Logout user and invalidate token
+ * @access Private (requires valid JWT)
+ * @headers {string} Authorization - Bearer token
+ * @returns {object} 200 - Success message
+ * @returns {object} 401 - If token is invalid or missing
+ * @returns {object} 500 - If an internal server error occurs
+ * Implemented by Aron Ogayon
+ */
+router.post('/logout', async (req, res) => {
+    try {
+        // Extract token from Authorization header
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+        if (!token) {
+            return res.status(401).json({ 
+                message: 'No token provided' 
+            });
+        }
+
+        // Verify the token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // In a production app, you would:
+        // 1. Add token to blacklist/revoked tokens table
+        // 2. Log the logout event
+        // 3. Update user's last logout time
+        
+        // For now, we'll just verify the token and send success
+        // TODO: Implement token blacklisting in production
+        
+        res.status(200).json({
+            message: 'Logout successful',
+            userId: decoded.userId
+        });
+        
+    } catch (error) {
+        console.error('Logout error:', error);
+        
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                message: 'Invalid token' 
+            });
+        }
+        
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ 
+                message: 'Token expired' 
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'Internal server error' 
+        });
+    }
+});
+
+/**
  * @route POST /api/auth/forgot-password
  * @description Send password reset email
  * @access Public
