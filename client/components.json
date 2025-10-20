@@ -17,5 +17,9 @@
     "lib": "@/lib",
     "composables": "@/composables"
   },
-  "registries": {}
+  "registries": {
+    "@shadcn": {
+      "url": "https://shadcn-vue.com/r/{name}"
+    }
+  }
 }
