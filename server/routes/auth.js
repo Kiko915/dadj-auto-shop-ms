@@ -15,11 +15,10 @@ const router = express.Router();
  * @returns {object} 400 - If Email and Password are not provided
  * @returns {object} 401 - If credentials are invalid (user not found or password mismatch)
  * @returns {object} 500 - If an internal server error occurs
- * TODO: Implement by Aron Ogayon
+ * Implemented by Aron Ogayon
  */
 router.post('/login', async (req, res) => {
     try {
-        // TODO: Implement login logic
         // 1. Validate email and password
         const { email, password } = req.body
 
