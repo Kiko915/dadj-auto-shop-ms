@@ -52,6 +52,15 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-vue-next'
+import { useSEO } from '@/composables/useSEO'
+
+// SEO Configuration
+useSEO({
+  title: 'Page Not Found - 404',
+  description: 'The page you are looking for could not be found. Return to DADJ Auto Shop homepage to explore our automotive services.',
+  keywords: '404, page not found, DADJ auto shop, error page',
+  type: 'website'
+})
 
 const router = useRouter()
 const authStore = useAuthStore()

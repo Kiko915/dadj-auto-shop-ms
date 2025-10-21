@@ -110,6 +110,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle, Mail, Loader2 } from "lucide-vue-next";
+import { useAuthSEO } from "@/composables/useSEO";
+
+// SEO Configuration
+useAuthSEO('forgotPassword')
 
 const email = ref("");
 const message = ref("");

@@ -139,6 +139,15 @@ import { authAPI } from '@/api/auth'
 import api from '@/api'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, LogOut, Users, Car, Settings } from 'lucide-vue-next'
+import { useSEO } from '@/composables/useSEO'
+
+// SEO Configuration
+useSEO({
+  title: 'Dashboard',
+  description: 'DADJ Auto Shop customer dashboard. View your service history, schedule appointments, and manage your vehicle information.',
+  keywords: 'dashboard, customer portal, vehicle services, appointment scheduling, service history',
+  type: 'website'
+})
 
 const router = useRouter()
 const authStore = useAuthStore()

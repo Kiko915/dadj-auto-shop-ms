@@ -189,6 +189,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-vue-next";
+import { useAuthSEO } from "@/composables/useSEO";
+
+// SEO Configuration
+useAuthSEO('resetPassword')
 
 const route = useRoute();
 const router = useRouter();
