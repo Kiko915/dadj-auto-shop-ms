@@ -17,9 +17,24 @@ export const authAPI = {
     return response.data
   },
 
-  // Forgot password (for future implementation)
+  // Forgot password
   forgotPassword: async (email) => {
     const response = await api.post('/auth/forgot-password', { email })
+    return response.data
+  },
+
+  // Verify reset token
+  verifyResetToken: async (token) => {
+    const response = await api.get(`/auth/verify-reset-token?token=${token}`)
+    return response.data
+  },
+
+  // Reset password
+  resetPassword: async (token, password) => {
+    const response = await api.post('/auth/reset-password', {
+      token,
+      password
+    })
     return response.data
   },
 
