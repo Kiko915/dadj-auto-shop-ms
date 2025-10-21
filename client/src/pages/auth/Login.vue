@@ -8,6 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Info, Eye, EyeOff, AlertCircle, Loader2, CheckCircle } from 'lucide-vue-next'
+import { useAuthSEO } from '@/composables/useSEO'
+
+// SEO Configuration
+useAuthSEO('login')
 
 const router = useRouter()
 const authStore = useAuthStore()
