@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authAPI } from '@/api/auth'
@@ -20,6 +20,60 @@ const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 const isLoginSuccess = ref(false)
+
+// Rotating content configuration
+const contentItems = [
+  {
+    title: 'Customized Workflow',
+    subtitle: 'The IMS is customized to be your trusted\nsystem when noting stocks.'
+  },
+  {
+    title: 'Real-Time Inventory',
+    subtitle: 'Instantly track parts, manage stock levels, and\nautomate reordering to avoid shortages.'
+  },
+  {
+    title: 'Detailed Service History',
+    subtitle: 'Access complete customer and vehicle histories\nwith just a few clicks for faster diagnostics.'
+  },
+  {
+    title: 'Integrated Billing',
+    subtitle: 'Generate accurate invoices, process payments, and\nmanage finances all in one place.'
+  },
+  {
+    title: 'Insightful Reporting',
+    subtitle: 'Create reports on sales, services, and inventory\nto make data-driven business decisions.'
+  }
+]
+
+const currentContentIndex = ref(0)
+let rotationInterval = null
+
+// Current content computed property
+const currentContent = computed(() => contentItems[currentContentIndex.value])
+
+// Start content rotation
+const startContentRotation = () => {
+  rotationInterval = setInterval(() => {
+    currentContentIndex.value = (currentContentIndex.value + 1) % contentItems.length
+  }, 10000) // Change every 10 seconds
+}
+
+// Stop content rotation
+const stopContentRotation = () => {
+  if (rotationInterval) {
+    clearInterval(rotationInterval)
+    rotationInterval = null
+  }
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  startContentRotation()
+})
+
+onUnmounted(() => {
+  stopContentRotation()
+})
 
 // Validation state
 const emailError = ref('')
@@ -155,13 +209,16 @@ const handleLogin = async () => {
 
       <!-- Content -->
       <div class="relative z-10 flex flex-col mt-30 px-[100px]">
-        <h2 class="text-white text-4xl font-light mb-4">
-          Customized Workflow
-        </h2>
-        <p class="text-white/80 text-xl font-extralight">
-          The IMS is customized to be your trusted<br />
-          system when noting stocks.
-        </p>
+        <Transition name="fade" mode="out-in">
+          <h2 :key="currentContent.title" class="text-white text-4xl font-light mb-4">
+            {{ currentContent.title }}
+          </h2>
+        </Transition>
+        <Transition name="fade" mode="out-in">
+          <p :key="currentContent.subtitle" class="text-white/80 text-xl font-extralight whitespace-pre-line">
+            {{ currentContent.subtitle }}
+          </p>
+        </Transition>
       </div>
 
       <!-- Screenshot Preview -->
@@ -310,5 +367,25 @@ const handleLogin = async () => {
 </template>
 
 <style scoped>
-/* Additional styles if needed */
+/* Smooth fade transition for rotating content */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
 </style>
