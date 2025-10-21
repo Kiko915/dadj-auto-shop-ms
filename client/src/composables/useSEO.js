@@ -22,7 +22,7 @@ export function useSEO(options = {}) {
     siteName: 'DADJ Auto Shop MS',
     defaultTitle: 'DADJ Auto Shop - Professional Auto Services',
     defaultDescription: 'DADJ Auto Shop provides professional automotive services including repairs, maintenance, and parts. Your trusted partner for all your vehicle needs.',
-    defaultImage: 'https://i.ibb.co/997jkKZB/symbol-w-wordmark-primary.png',
+    defaultImage: '/acc-og.png', // Updated to use the new OG image
     baseUrl: 'https://dadj-auto-shop.com' // Update with your actual domain
   }
 
