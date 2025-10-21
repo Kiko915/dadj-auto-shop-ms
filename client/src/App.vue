@@ -1,5 +1,6 @@
 <script setup>
 import { useSEO } from '@/composables/useSEO'
+import GlobalLoader from '@/components/common/GlobalLoader.vue'
 
 // Default SEO configuration for the entire app
 useSEO({
@@ -13,5 +14,6 @@ useSEO({
 <template>
   <div id="app">
     <router-view></router-view>
+    <GlobalLoader />
   </div>
 </template>
