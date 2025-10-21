@@ -13,13 +13,13 @@ export function useSEO(options = {}) {
     image,
     url,
     type = 'website',
-    siteName = 'DADJ Auto Shop',
+    siteName = 'DADJ Auto Shop MS',
     twitterCard = 'summary_large_image'
   } = options
 
   // Default SEO configuration for DADJ Auto Shop
   const defaultConfig = {
-    siteName: 'DADJ Auto Shop',
+    siteName: 'DADJ Auto Shop MS',
     defaultTitle: 'DADJ Auto Shop - Professional Auto Services',
     defaultDescription: 'DADJ Auto Shop provides professional automotive services including repairs, maintenance, and parts. Your trusted partner for all your vehicle needs.',
     defaultImage: 'https://i.ibb.co/997jkKZB/symbol-w-wordmark-primary.png',
