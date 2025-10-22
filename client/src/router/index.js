@@ -36,9 +36,26 @@ const router = createRouter({
     },
     {
       path: '/dashboard',
-      name: 'dashboard',
-      component: () => import('@/pages/dashboard/Dashboard.vue'),
-      meta: { requiresAuth: true }
+      component: () => import('@/components/views/DashboardLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'dashboard',
+          component: () => import('@/pages/dashboard/Dashboard.vue'),
+        },
+        {
+          path: 'analytics',
+          name: 'analytics',
+          component: () => import('@/pages/dashboard/Analytics.vue'),
+        },
+        // Add more dashboard routes here as children
+        // {
+        //   path: 'vehicles',
+        //   name: 'vehicles',
+        //   component: () => import('@/pages/dashboard/Vehicles.vue'),
+        // },
+      ]
     },
     {
       path: '/:pathMatch(.*)*',
