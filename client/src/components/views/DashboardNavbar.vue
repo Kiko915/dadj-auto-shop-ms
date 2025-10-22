@@ -32,12 +32,16 @@ const authStore = useAuthStore()
 // Mock notifications count - replace with actual data
 const notificationsCount = ref(3)
 
-const handleLogout = async () => {
+const handleLogout = () => {
   try {
-    await authStore.logout()
+    // Call logout which clears local storage and calls server
+    authStore.logout()
+    
+    // Redirect to login page
     router.push('/auth/login')
   } catch (error) {
     console.error('Logout error:', error)
+    // Even if there's an error, still redirect to login
     router.push('/auth/login')
   }
 }
