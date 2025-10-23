@@ -6,11 +6,13 @@ import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import ProfileDisplay from './ProfileDisplay.vue'
 import EditProfileDialog from './EditProfileDialog.vue'
+import AvatarUploadDialog from './AvatarUploadDialog.vue'
 
 const authStore = useAuthStore()
 
 // Dialog state
 const isEditDialogOpen = ref(false)
+const isAvatarDialogOpen = ref(false)
 const isSaving = ref(false)
 
 // User data computed
@@ -30,6 +32,16 @@ const user = computed(() => ({
 // Handlers
 const handleEditClick = () => {
   isEditDialogOpen.value = true
+}
+
+const handleChangeAvatar = () => {
+  isAvatarDialogOpen.value = true
+}
+
+const handleAvatarUploaded = (updatedUser) => {
+  // Update auth store with new profile picture
+  authStore.updateProfile(updatedUser)
+  isAvatarDialogOpen.value = false
 }
 
 const handleSaveProfile = async ({ isValid, data, error, type }) => {
@@ -90,7 +102,11 @@ const handleCancelEdit = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ProfileDisplay :user="user" @edit="handleEditClick" />
+        <ProfileDisplay 
+          :user="user" 
+          @edit="handleEditClick" 
+          @change-avatar="handleChangeAvatar"
+        />
       </CardContent>
     </Card>
 
@@ -101,6 +117,12 @@ const handleCancelEdit = () => {
       :is-saving="isSaving"
       @save="handleSaveProfile"
       @cancel="handleCancelEdit"
+    />
+
+    <!-- Avatar Upload Dialog -->
+    <AvatarUploadDialog
+      v-model:open="isAvatarDialogOpen"
+      @uploaded="handleAvatarUploaded"
     />
   </div>
 </template>
