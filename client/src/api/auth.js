@@ -48,6 +48,12 @@ export const authAPI = {
   logout: async () => {
     const response = await api.post('/auth/logout')
     return response.data
+  },
+
+  // Update user profile
+  updateProfile: async (profileData) => {
+    const response = await api.patch('/user/profile', profileData)
+    return response.data
   }
 }
 

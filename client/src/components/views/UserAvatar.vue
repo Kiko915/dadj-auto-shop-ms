@@ -30,7 +30,7 @@ const avatarUrl = computed(() => {
   
   // Use DiceBear API with the email as seed for consistent avatars
   const seed = encodeURIComponent(props.email)
-  return `https://api.dicebear.com/9.x/avataaars-neutral/svg?seed=${seed}`
+  return `https://api.dicebear.com/9.x/thumbs/svg?seed=${seed}`
 })
 
 // Get user initials as fallback
