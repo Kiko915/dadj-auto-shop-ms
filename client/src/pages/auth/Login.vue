@@ -164,7 +164,7 @@ const handleLogin = async () => {
     // Success - store token and redirect
     if (data.token) {
       // Use auth store to manage authentication
-      authStore.login(data.token, email.value)
+      authStore.login(data.token, data.user)
       
       // Show success indicator
       isLoginSuccess.value = true

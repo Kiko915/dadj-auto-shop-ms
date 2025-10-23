@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -12,11 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/ui/avatar'
+import UserAvatar from '@/components/views/UserAvatar.vue'
 import {
   Bell,
   User,
@@ -32,6 +28,12 @@ const authStore = useAuthStore()
 // Mock notifications count - replace with actual data
 const notificationsCount = ref(3)
 
+// Format user role for display
+const displayRole = computed(() => {
+  const role = authStore.userRole || 'user'
+  return role.charAt(0).toUpperCase() + role.slice(1)
+})
+
 const handleLogout = () => {
   try {
     // Call logout which clears local storage and calls server
@@ -44,11 +46,6 @@ const handleLogout = () => {
     // Even if there's an error, still redirect to login
     router.push('/auth/login')
   }
-}
-
-const getUserInitials = () => {
-  const email = authStore.userEmail || ''
-  return email.charAt(0).toUpperCase()
 }
 </script>
 
@@ -83,15 +80,14 @@ const getUserInitials = () => {
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" class="relative h-10 gap-2 px-2">
-            <Avatar class="h-8 w-8">
-              <AvatarImage src="" alt="User avatar" />
-              <AvatarFallback class="bg-primary text-primary-foreground">
-                {{ getUserInitials() }}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar 
+              :email="authStore.userEmail" 
+              :profile-picture="authStore.profilePicture"
+              size="default"
+            />
             <div class="hidden md:flex flex-col items-start text-left">
               <span class="text-sm font-medium">{{ authStore.userEmail }}</span>
-              <span class="text-xs text-muted-foreground">Admin</span>
+              <span class="text-xs text-muted-foreground">{{ displayRole }}</span>
             </div>
             <ChevronDown class="h-4 w-4 text-muted-foreground" />
           </Button>
