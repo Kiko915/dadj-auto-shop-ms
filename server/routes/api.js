@@ -3,6 +3,7 @@ import express from 'express';
 import prisma from '../db.js'; 
 import { authenticateToken } from '../middleware/auth.js';
 import imagekit from '../config/imagekit.js';
+import bcrypt from 'bcrypt';
 
 const router = express.Router();
     
@@ -189,6 +190,92 @@ router.patch('/user/profile-picture', authenticateToken, async (req, res) => {
         console.error('Profile picture update error:', error);
         res.status(500).json({
             error: 'Failed to update profile picture'
+        });
+    }
+});
+
+/**
+ * @route PATCH /api/user/password
+ * @description Update user password
+ * @access Private
+ * @body {string} currentPassword - Current password for verification
+ * @body {string} newPassword - New password to set
+ */
+router.patch('/user/password', authenticateToken, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.user.id;
+
+        // Validate input
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                message: 'Current password and new password are required'
+            });
+        }
+
+        // Validate new password strength
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                message: 'New password must be at least 8 characters long'
+            });
+        }
+
+        // Check for password complexity
+        const hasLowercase = /[a-z]/.test(newPassword);
+        const hasUppercase = /[A-Z]/.test(newPassword);
+        const hasNumber = /[0-9]/.test(newPassword);
+        const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+
+        if (!hasLowercase || !hasUppercase || !hasNumber) {
+            return res.status(400).json({
+                message: 'Password must contain uppercase, lowercase, and numbers'
+            });
+        }
+
+        // Get current user with password
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, password: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'User not found'
+            });
+        }
+
+        // Verify current password
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!isValidPassword) {
+            return res.status(401).json({
+                message: 'Current password is incorrect'
+            });
+        }
+
+        // Check if new password is same as current
+        const isSamePassword = await bcrypt.compare(newPassword, user.password);
+        if (isSamePassword) {
+            return res.status(400).json({
+                message: 'New password must be different from current password'
+            });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update password
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword }
+        });
+
+        res.status(200).json({
+            message: 'Password updated successfully'
+        });
+    } catch (error) {
+        console.error('Password update error:', error);
+        res.status(500).json({
+            message: 'Failed to update password'
         });
     }
 });

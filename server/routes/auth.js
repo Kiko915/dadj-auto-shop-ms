@@ -284,7 +284,7 @@ router.post('/forgot-password', async (req, res) => {
  * @returns {object} 400 - If token is missing
  * @returns {object} 404 - If token is invalid or expired
  * @returns {object} 500 - If an internal server error occurs
- * Implemented by Assistant
+ * Implemented by Francis Mistica
  */
 router.get('/verify-reset-token', async (req, res) => {
     try {
@@ -348,7 +348,7 @@ router.get('/verify-reset-token', async (req, res) => {
  * @returns {object} 400 - If token or password is missing, or password is invalid
  * @returns {object} 404 - If token is invalid or expired
  * @returns {object} 500 - If an internal server error occurs
- * Implemented by Assistant
+ * Implemented by Francis Mistica
  */
 router.post('/reset-password', async (req, res) => {
     try {

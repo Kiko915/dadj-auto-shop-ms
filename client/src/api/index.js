@@ -1,5 +1,8 @@
 // api/index.js - Axios configuration
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
+import router from '@/router'
+import { toast } from 'vue-sonner'
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -32,10 +35,25 @@ api.interceptors.response.use(
   (error) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      // Unauthorized - remove token and redirect to login
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('userEmail')
-      // You can add router redirect here if needed
+      const errorCode = error.response?.data?.error
+      
+      // Check if it's an expired token
+      if (errorCode === 'EXPIRED_TOKEN') {
+        toast.error('Session Expired', {
+          description: 'Your session has expired. Please log in again.'
+        })
+      } else {
+        toast.error('Authentication Failed', {
+          description: 'Please log in to continue.'
+        })
+      }
+      
+      // Clear auth state
+      const authStore = useAuthStore()
+      authStore.logout()
+      
+      // Redirect to login page
+      router.push('/auth/login')
     }
     return Promise.reject(error)
   }
