@@ -42,6 +42,10 @@ api.interceptors.response.use(
         toast.error('Session Expired', {
           description: 'Your session has expired. Please log in again.'
         })
+      } else if (errorCode === 'SESSION_TERMINATED') {
+        toast.error('Session Terminated', {
+          description: 'This session was logged out from another device.'
+        })
       } else {
         toast.error('Authentication Failed', {
           description: 'Please log in to continue.'
