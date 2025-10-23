@@ -1,6 +1,7 @@
 // middleware/auth.js - JWT Authentication Middleware
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
+import { parseUserAgent, getClientIp } from '../utils/sessionParser.js';
 
 /**
  * Middleware to verify JWT token and authenticate user
@@ -36,6 +37,30 @@ export const authenticateToken = async (req, res, next) => {
         error: 'INVALID_USER'
       });
     }
+
+    // Check if session exists in database (not terminated)
+    const session = await prisma.userSession.findFirst({
+      where: { 
+        token,
+        userId: user.id,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!session) {
+      return res.status(401).json({ 
+        message: 'Session not found or expired',
+        error: 'SESSION_TERMINATED'
+      });
+    }
+
+    // Update session last activity
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: { 
+        lastActivity: new Date() 
+      }
+    });
 
     // Add user info to request object
     req.user = user;

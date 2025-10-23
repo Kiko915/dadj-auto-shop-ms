@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import prisma from '../db.js';
+import { parseUserAgent, getClientIp } from '../utils/sessionParser.js';
 
 const router = express.Router();
 
@@ -51,6 +52,40 @@ router.post('/login', async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '1h' },
         )
+
+        // 4.5 Create session record
+        const userAgent = req.headers['user-agent'] || '';
+        const { device, browser } = parseUserAgent(userAgent);
+        const ipAddress = getClientIp(req);
+        
+        console.log('Creating session for user:', user.id, 'Device:', device, 'Browser:', browser);
+        
+        // First, delete any expired sessions for this user (cleanup)
+        const expiredDeleted = await prisma.userSession.deleteMany({
+            where: {
+                userId: user.id,
+                expiresAt: { lt: new Date() }
+            }
+        });
+        
+        console.log('Deleted expired sessions:', expiredDeleted.count);
+        
+        // Create new session
+        const newSession = await prisma.userSession.create({
+            data: {
+                userId: user.id,
+                token,
+                deviceInfo: device,
+                browser,
+                ipAddress,
+                userAgent,
+                location: 'Philippines', // You can use IP geolocation API for accurate location
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+                lastActivity: new Date()
+            }
+        });
+        
+        console.log('New session created:', newSession.id);
 
         // 5. Return user data and token
         res.status(200).json({
@@ -103,17 +138,25 @@ router.post('/logout', async (req, res) => {
         // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
-        // In a production app, you would:
-        // 1. Add token to blacklist/revoked tokens table
-        // 2. Log the logout event
-        // 3. Update user's last logout time
+        console.log('Logout attempt:', {
+            userId: decoded.userId,
+            token: token.substring(0, 20) + '...'
+        });
         
-        // For now, we'll just verify the token and send success
-        // TODO: Implement token blacklisting in production
+        // Delete the session from database
+        const result = await prisma.userSession.deleteMany({
+            where: {
+                token,
+                userId: decoded.userId
+            }
+        });
+        
+        console.log('Sessions deleted:', result.count);
         
         res.status(200).json({
             message: 'Logout successful',
-            userId: decoded.userId
+            userId: decoded.userId,
+            sessionsDeleted: result.count
         });
         
     } catch (error) {

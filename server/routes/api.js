@@ -280,5 +280,114 @@ router.patch('/user/password', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * @route GET /api/user/sessions
+ * @description Get all active sessions for the current user
+ * @access Private (requires valid JWT)
+ * @returns {object} 200 - Array of active sessions
+ * @returns {object} 401 - Unauthorized
+ * @returns {object} 500 - Internal server error
+ */
+router.get('/user/sessions', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const currentToken = req.token;
+
+        // Get all active sessions (not expired)
+        const sessions = await prisma.userSession.findMany({
+            where: {
+                userId,
+                expiresAt: { gt: new Date() }
+            },
+            orderBy: {
+                lastActivity: 'desc'
+            },
+            select: {
+                id: true,
+                deviceInfo: true,
+                browser: true,
+                ipAddress: true,
+                location: true,
+                lastActivity: true,
+                createdAt: true,
+                token: true
+            }
+        });
+
+        // Mark current session
+        const sessionsWithStatus = sessions.map(session => ({
+            ...session,
+            isCurrent: session.token === currentToken,
+            // Don't send token to client for security
+            token: undefined
+        }));
+
+        res.status(200).json({ sessions: sessionsWithStatus });
+    } catch (error) {
+        console.error('Get sessions error:', error);
+        res.status(500).json({
+            message: 'Failed to retrieve sessions'
+        });
+    }
+});
+
+/**
+ * @route DELETE /api/user/sessions/:sessionId
+ * @description Logout/delete a specific session
+ * @access Private (requires valid JWT)
+ * @param {string} sessionId - ID of the session to delete
+ * @returns {object} 200 - Success message
+ * @returns {object} 400 - Cannot delete current session
+ * @returns {object} 401 - Unauthorized
+ * @returns {object} 404 - Session not found
+ * @returns {object} 500 - Internal server error
+ */
+router.delete('/user/sessions/:sessionId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const currentToken = req.token;
+        const { sessionId } = req.params;
+
+        // Find the session
+        const session = await prisma.userSession.findUnique({
+            where: { id: sessionId }
+        });
+
+        if (!session) {
+            return res.status(404).json({
+                message: 'Session not found'
+            });
+        }
+
+        // Check if session belongs to user
+        if (session.userId !== userId) {
+            return res.status(403).json({
+                message: 'Unauthorized to delete this session'
+            });
+        }
+
+        // Prevent deleting current session
+        if (session.token === currentToken) {
+            return res.status(400).json({
+                message: 'Cannot delete current session. Use logout instead.'
+            });
+        }
+
+        // Delete the session
+        await prisma.userSession.delete({
+            where: { id: sessionId }
+        });
+
+        res.status(200).json({
+            message: 'Session terminated successfully'
+        });
+    } catch (error) {
+        console.error('Delete session error:', error);
+        res.status(500).json({
+            message: 'Failed to delete session'
+        });
+    }
+});
+
 // Export the router using ES6 syntax
 export default router;
