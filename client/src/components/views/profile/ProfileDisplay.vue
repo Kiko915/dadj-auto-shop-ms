@@ -12,6 +12,7 @@ import {
   Edit,
   CheckCircle,
   MapPin,
+  Camera,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -21,7 +22,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit'])
+const emit = defineEmits(['edit', 'change-avatar'])
 
 // Format role for display
 const displayRole = computed(() => {
@@ -42,6 +43,10 @@ const joinedDate = computed(() => {
 const handleEdit = () => {
   emit('edit')
 }
+
+const handleChangeAvatar = () => {
+  emit('change-avatar')
+}
 </script>
 
 <template>
@@ -55,12 +60,25 @@ const handleEdit = () => {
     <CardContent class="space-y-6">
       <!-- Avatar Section -->
       <div class="flex items-center gap-6">
-        <UserAvatar 
-          :email="user.email" 
-          :profile-picture="user.profilePicture"
-          size="lg"
-          class="h-20 w-20"
-        />
+        <div 
+          class="relative group cursor-pointer"
+          @click="handleChangeAvatar"
+          role="button"
+          tabindex="0"
+          @keydown.enter="handleChangeAvatar"
+          @keydown.space.prevent="handleChangeAvatar"
+        >
+          <UserAvatar 
+            :email="user.email" 
+            :profile-picture="user.profilePicture"
+            size="lg"
+            class="h-20 w-20"
+          />
+          <!-- Hover Overlay -->
+          <div class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Camera class="h-8 w-8 text-white" />
+          </div>
+        </div>
         <div class="space-y-1">
           <h3 class="text-lg font-semibold">
             {{ user.name || user.email?.split('@')[0] }}

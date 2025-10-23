@@ -2,6 +2,7 @@ import express from 'express';
 // Import the Prisma client initialized in db.js
 import prisma from '../db.js'; 
 import { authenticateToken } from '../middleware/auth.js';
+import imagekit from '../config/imagekit.js';
 
 const router = express.Router();
     
@@ -122,6 +123,72 @@ router.patch('/user/profile', authenticateToken, async (req, res) => {
         console.error('Profile update error:', error);
         res.status(500).json({
             error: 'Failed to update profile'
+        });
+    }
+});
+
+/**
+ * @route GET /api/imagekit-auth
+ * @description Get ImageKit authentication parameters for client-side upload
+ * @access Private
+ */
+router.get('/imagekit-auth', authenticateToken, async (req, res) => {
+    try {
+        const authenticationParameters = imagekit.getAuthenticationParameters();
+        res.status(200).json(authenticationParameters);
+    } catch (error) {
+        console.error('ImageKit auth error:', error);
+        res.status(500).json({
+            error: 'Failed to get ImageKit authentication parameters'
+        });
+    }
+});
+
+/**
+ * @route PATCH /api/user/profile-picture
+ * @description Update user's profile picture URL
+ * @access Private
+ */
+router.patch('/user/profile-picture', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { profilePicture } = req.body;
+
+        // Validate input
+        if (!profilePicture) {
+            return res.status(400).json({
+                error: 'Profile picture URL is required'
+            });
+        }
+
+        // Update user's profile picture
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { profilePicture },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                profilePicture: true,
+                region: true,
+                province: true,
+                city: true,
+                barangay: true,
+                street: true,
+                country: true,
+                createdAt: true,
+            }
+        });
+
+        res.status(200).json({
+            message: 'Profile picture updated successfully',
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error('Profile picture update error:', error);
+        res.status(500).json({
+            error: 'Failed to update profile picture'
         });
     }
 });

@@ -54,6 +54,12 @@ export const authAPI = {
   updateProfile: async (profileData) => {
     const response = await api.patch('/user/profile', profileData)
     return response.data
+  },
+
+  // Update profile picture
+  updateProfilePicture: async (profilePicture) => {
+    const response = await api.patch('/user/profile-picture', { profilePicture })
+    return response.data
   }
 }
 
