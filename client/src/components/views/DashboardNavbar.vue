@@ -86,7 +86,7 @@ const handleLogout = () => {
               size="default"
             />
             <div class="hidden md:flex flex-col items-start text-left">
-              <span class="text-sm font-medium">{{ authStore.userEmail }}</span>
+              <span class="text-sm font-medium">{{authStore.userName || authStore.userEmail }}</span>
               <span class="text-xs text-muted-foreground">{{ displayRole }}</span>
             </div>
             <ChevronDown class="h-4 w-4 text-muted-foreground" />

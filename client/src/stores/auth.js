@@ -106,6 +106,50 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('street')
     localStorage.removeItem('country')
   }
+
+  function updateProfile(userData) {
+    // Update state with new user data
+    if (userData.name !== undefined) {
+      userName.value = userData.name
+      localStorage.setItem('userName', userData.name)
+    }
+    
+    if (userData.region !== undefined) {
+      region.value = userData.region
+      if (userData.region) localStorage.setItem('region', userData.region)
+      else localStorage.removeItem('region')
+    }
+    
+    if (userData.province !== undefined) {
+      province.value = userData.province
+      if (userData.province) localStorage.setItem('province', userData.province)
+      else localStorage.removeItem('province')
+    }
+    
+    if (userData.city !== undefined) {
+      city.value = userData.city
+      if (userData.city) localStorage.setItem('city', userData.city)
+      else localStorage.removeItem('city')
+    }
+    
+    if (userData.barangay !== undefined) {
+      barangay.value = userData.barangay
+      if (userData.barangay) localStorage.setItem('barangay', userData.barangay)
+      else localStorage.removeItem('barangay')
+    }
+    
+    if (userData.street !== undefined) {
+      street.value = userData.street
+      if (userData.street) localStorage.setItem('street', userData.street)
+      else localStorage.removeItem('street')
+    }
+    
+    if (userData.profilePicture !== undefined) {
+      profilePicture.value = userData.profilePicture
+      if (userData.profilePicture) localStorage.setItem('profilePicture', userData.profilePicture)
+      else localStorage.removeItem('profilePicture')
+    }
+  }
   
   function getAuthHeader() {
     return token.value ? { Authorization: `Bearer ${token.value}` } : {}
@@ -131,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     login,
     logout,
+    updateProfile,
     getAuthHeader
   }
 })
