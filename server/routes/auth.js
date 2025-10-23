@@ -56,6 +56,19 @@ router.post('/login', async (req, res) => {
         res.status(200).json({
             message: 'Login Success',
             token: token,
+            user: {
+                email: user.email,
+                role: user.role,
+                name: user.name,
+                profilePicture: user.profilePicture,
+                createdAt: user.createdAt,
+                region: user.region,
+                province: user.province,
+                city: user.city,
+                barangay: user.barangay,
+                street: user.street,
+                country: user.country
+            }
         });
     } catch (error) {
         console.error('Login error:', error);

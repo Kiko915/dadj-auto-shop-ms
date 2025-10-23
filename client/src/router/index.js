@@ -49,6 +49,11 @@ const router = createRouter({
           name: 'analytics',
           component: () => import('@/pages/dashboard/Analytics.vue'),
         },
+        {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('@/pages/dashboard/Profile.vue'),
+        },
         // Add more dashboard routes here as children
         // {
         //   path: 'vehicles',

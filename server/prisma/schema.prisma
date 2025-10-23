@@ -24,6 +24,15 @@ model User {
   role          String   @default("user") // user, admin, mechanic
   isActive      Boolean  @default(true)
   profilePicture String? // URL or path to profile picture
+  
+  // Address fields
+  region        String?
+  province      String?
+  city          String?
+  barangay      String?
+  street        String?
+  country       String   @default("Philippines")
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
