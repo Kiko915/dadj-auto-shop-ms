@@ -389,5 +389,102 @@ router.delete('/user/sessions/:sessionId', authenticateToken, async (req, res) =
     }
 });
 
+/**
+ * @route GET /api/user/export
+ * @description Export user's complete data (profile, address, sessions, etc.)
+ * @access Private (requires valid JWT)
+ */
+router.get('/user/export', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get complete user data
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                profilePicture: true,
+                country: true,
+                region: true,
+                province: true,
+                city: true,
+                barangay: true,
+                street: true,
+                createdAt: true,
+                updatedAt: true,
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'User not found'
+            });
+        }
+
+        // Get active sessions
+        const sessions = await prisma.userSession.findMany({
+            where: { 
+                userId: userId,
+                expiresAt: { gt: new Date() }
+            },
+            select: {
+                id: true,
+                deviceInfo: true,
+                browser: true,
+                ipAddress: true,
+                location: true,
+                lastActivity: true,
+                createdAt: true,
+            },
+            orderBy: {
+                lastActivity: 'desc'
+            }
+        });
+
+        // Prepare export data
+        const exportData = {
+            profile: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                profilePicture: user.profilePicture,
+            },
+            address: {
+                country: user.country,
+                region: user.region,
+                province: user.province,
+                city: user.city,
+                barangay: user.barangay,
+                street: user.street,
+            },
+            sessions: sessions.map(session => ({
+                device: session.deviceInfo,
+                browser: session.browser,
+                ipAddress: session.ipAddress,
+                location: session.location,
+                lastActivity: session.lastActivity,
+                loginDate: session.createdAt,
+            })),
+            metadata: {
+                accountCreated: user.createdAt,
+                lastUpdated: user.updatedAt,
+                exportDate: new Date().toISOString(),
+                totalActiveSessions: sessions.length,
+            }
+        };
+
+        res.status(200).json(exportData);
+    } catch (error) {
+        console.error('Export data error:', error);
+        res.status(500).json({
+            message: 'Failed to export data'
+        });
+    }
+});
+
 // Export the router using ES6 syntax
 export default router;
