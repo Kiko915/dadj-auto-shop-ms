@@ -486,5 +486,94 @@ router.get('/user/export', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * @route DELETE /api/user/account
+ * @description Delete user account (requires password and confirmation word)
+ * @access Private (requires valid JWT) - Admins cannot delete their own accounts
+ */
+router.delete('/user/account', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { password, confirmationWord, providedWord } = req.body;
+
+        // Validation
+        if (!password || !confirmationWord || !providedWord) {
+            return res.status(400).json({
+                message: 'Password, confirmation word, and provided word are required'
+            });
+        }
+
+        // Get user with password
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                password: true,
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'User not found'
+            });
+        }
+
+        // Check if user is an admin
+        if (user.role === 'admin') {
+            return res.status(403).json({
+                error: 'ADMIN_DELETE_RESTRICTED',
+                message: 'Admin accounts cannot be self-deleted. Please contact the developers for account deletion.',
+                supportEmail: 'synera.swe@gmail.com'
+            });
+        }
+
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                error: 'INVALID_PASSWORD',
+                message: 'Incorrect password'
+            });
+        }
+
+        // Verify confirmation word
+        if (confirmationWord !== providedWord) {
+            return res.status(400).json({
+                error: 'INVALID_CONFIRMATION',
+                message: 'Confirmation word does not match'
+            });
+        }
+
+        // Delete all user sessions first
+        await prisma.userSession.deleteMany({
+            where: { userId: userId }
+        });
+
+        // Delete the user account
+        await prisma.user.delete({
+            where: { id: userId }
+        });
+
+        console.log(`Account deleted for user: ${user.email} (${user.name})`);
+
+        res.status(200).json({
+            message: 'Account successfully deleted',
+            deletedUser: {
+                email: user.email,
+                name: user.name,
+                deletedAt: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('Delete account error:', error);
+        res.status(500).json({
+            message: 'Failed to delete account'
+        });
+    }
+});
+
 // Export the router using ES6 syntax
 export default router;
