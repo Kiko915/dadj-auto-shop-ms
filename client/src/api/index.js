@@ -37,27 +37,28 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const errorCode = error.response?.data?.error
       
-      // Check if it's an expired token
+      // Only auto-logout for session-related errors, not for invalid credentials
       if (errorCode === 'EXPIRED_TOKEN') {
         toast.error('Session Expired', {
           description: 'Your session has expired. Please log in again.'
         })
+        
+        // Clear auth state and redirect
+        const authStore = useAuthStore()
+        authStore.logout()
+        router.push('/auth/login')
       } else if (errorCode === 'SESSION_TERMINATED') {
         toast.error('Session Terminated', {
           description: 'This session was logged out from another device.'
         })
-      } else {
-        toast.error('Authentication Failed', {
-          description: 'Please log in to continue.'
-        })
+        
+        // Clear auth state and redirect
+        const authStore = useAuthStore()
+        authStore.logout()
+        router.push('/auth/login')
       }
-      
-      // Clear auth state
-      const authStore = useAuthStore()
-      authStore.logout()
-      
-      // Redirect to login page
-      router.push('/auth/login')
+      // For INVALID_PASSWORD and other 401 errors, just pass through to component
+      // Don't auto-logout as it might be user error (wrong password, etc.)
     }
     return Promise.reject(error)
   }
