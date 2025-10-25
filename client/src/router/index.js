@@ -60,6 +60,10 @@ const router = createRouter({
         //   name: 'vehicles',
         //   component: () => import('@/pages/dashboard/Vehicles.vue'),
         // },
+        {path: 'customers',
+          name: 'customers',
+          component: () => import('@/pages/dashboard/Customer.vue'),
+        }
       ]
     },
     {
