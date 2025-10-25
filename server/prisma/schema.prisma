@@ -38,6 +38,7 @@ model User {
 
   // Relations
   passwordResets PasswordReset[]
+  sessions       UserSession[]
 
   @@map("users")
 }
@@ -54,6 +55,27 @@ model PasswordReset {
   user      User     @relation(fields: [email], references: [email])
 
   @@map("password_resets")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  deviceInfo   String?  // e.g., "Windows 10"
+  browser      String?  // e.g., "Chrome 120"
+  ipAddress    String?
+  userAgent    String?
+  location     String?  // e.g., "Philippines"
+  lastActivity DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("user_sessions")
 }
 
 model Customer {

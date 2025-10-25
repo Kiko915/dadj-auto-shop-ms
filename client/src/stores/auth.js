@@ -66,20 +66,19 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.country) localStorage.setItem('country', user.country)
   }
   
-  function logout() {
+  async function logout() {
     // Call server logout if token exists
     if (token.value) {
       try {
-        authAPI.logout().catch(error => {
-          console.warn('Server logout failed:', error.message)
-          // Continue with client-side logout even if server fails
-        })
+        await authAPI.logout()
+        console.log('✅ Server logout successful')
       } catch (error) {
-        console.warn('Server logout error:', error.message)
+        console.warn('⚠️ Server logout failed:', error.message)
+        // Continue with client-side logout even if server fails
       }
     }
     
-    // Always clear client-side data
+    // Clear client-side data
     token.value = null
     userEmail.value = null
     userRole.value = null

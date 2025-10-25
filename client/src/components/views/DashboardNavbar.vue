@@ -34,10 +34,10 @@ const displayRole = computed(() => {
   return role.charAt(0).toUpperCase() + role.slice(1)
 })
 
-const handleLogout = () => {
+const handleLogout = async () => {
   try {
     // Call logout which clears local storage and calls server
-    authStore.logout()
+    await authStore.logout()
     
     // Redirect to login page
     router.push('/auth/login')
