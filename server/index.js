@@ -8,7 +8,7 @@ import cors from 'cors';
 import apiRoutes from './routes/api.js'; // Note the .js extension is often required for ESM
 import authRoutes from './routes/auth.js';
 import protectedRoutes from './routes/protected.js';
-import customerRoutes from './routes/customer.js';
+import customerRoutes from './routes/customers.js';
 import vehicleRoutes from './routes/vehicles.js'
 
 // --- Initialization ---
