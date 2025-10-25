@@ -7,9 +7,11 @@ import prisma from '../db.js';
 const router = express.Router();
 
 /**
- * @route POST /add-customer
+ * @route POST /api/customers/add-customer
  * @desc Add a new customer profile
  * @access Staff, Admin
+ * @body {string} id - The unique customer ID (cuid)
+ * @returns {object} Confirmation of deletion or error message
  */
 router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
@@ -21,7 +23,8 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
             notes,
             loyaltyStatus
         } = req.body;
-
+        
+        // Input Validation
         if (!firstName || !lastName || !phoneNumber) {
             return res.status(400).json({
                 message: 'Missing required fields: firstName, lastName, and phoneNumber are required',
@@ -29,6 +32,7 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
             });
         }
 
+        // Creates the User
         const newCustomer = await prisma.customer.create({
             data: {
                 firstName,
@@ -42,7 +46,7 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
 
         return res.status(201).json({
             message: 'Customer added successfully',
-            data: newCustomer,
+            newCustomer,
         });
     } catch (error) {
         console.error('Add Customer Error:', error);
@@ -63,13 +67,17 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
 });
 
 /**
- * @route POST /delete-customer
+ * @route POST /api/customers/delete-customer
  * @desc Delete an existing customer by ID
  * @access Staff, Admin
+ * @body {string} id - The unique customer ID (cuid)
+ * @returns {object} Confirmation of deletion or error message
  */
 router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.body;
+
+        // Check if an ID is Provided
         if (!id) {
             return res.status(400).json({
                 message: 'Customer ID is required',
@@ -77,6 +85,7 @@ router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
         
+        // Check if the user exist
         const existing_customer = await prisma.customer.findUnique({
             where: id
         });
@@ -88,6 +97,7 @@ router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
 
+        // Delete the User
         await prisma.customer.delete({
             where: { id },
         });
@@ -106,9 +116,20 @@ router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'adm
 });
 
 /**
- * @route POST /update-customer
- * @desc Update customer profile details
+ * @route POST api/customers/update-customer
+ * @desc Update an existing customer's information
  * @access Staff, Admin
+ * @body {string} id - The unique customer ID (cuid)
+ * @body {string} [firstName] - Updated first name
+ * @body {string} [lastName] - Updated last name
+ * @body {string} [phoneNumber] - Updated phone number
+ * @body {string} [email] - Updated email (must remain unique)
+ * @body {string} [notes] - Updated notes
+ * @body {boolean} [isActive] - Active/inactive status
+ * @body {string} [loyaltyStatus] - Updated loyalty status (regular, silver, gold, platinum)
+ * @body {number} [serviceCount] - Updated service count
+ * @body {number} [totalSpent] - Updated total amount spent
+ * @returns {object} The updated customer record
  */
 router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
@@ -125,6 +146,7 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             totalSpent
         } = req.body;
 
+        // Check if an ID Is Provided
         if (!id) {
             return res.status(400).json({
                 message: 'Customer ID is required',
@@ -132,6 +154,7 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
 
+        // Check if the user exist
         const existingCustomer = await prisma.customer.findUnique({
             where: { id },
         });
@@ -143,6 +166,7 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
 
+        // Update the necessary fields/given by the client
         const updatedCustomer = await prisma.customer.update({
             where: { id },
             data: {
@@ -181,15 +205,24 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
 });
 
 /**
- * @route GET /
- * @desc Get all customers or a single customer by ID (via query param)
+ * @route GET /api/customers
+ * @desc Retrieve customers from the database. If an ID is provided, fetch a single customer; otherwise, return all customers.
  * @access Staff, Admin
+ * @query {string} [id] - Optional customer ID to fetch a specific record
+ * @returns {object|array} Customer data or a list of all customers
+ * @example
+ * // Get all customers
+ * GET /customers
+ * 
+ * // Get one customer
+ * GET /customers?id=clxyz123456789
  */
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.query;
 
         if (id) {
+            // Fetch Single Customer
             const customer = await prisma.customer.findUnique({
                 where: id,
             });
@@ -206,7 +239,7 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
                 customer
             });
         } else {
-            // TODO: Fetch all customer
+            // Fetch all customer
             const customers = await prisma.customer.findMany({
                 orderBy: { lastModified: 'desc' }
             });
