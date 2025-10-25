@@ -197,5 +197,51 @@ const viewProfile = (id: string) => {
         </TableBody>
       </Table>
     </section>
+
+    <!-- Pagination Controls -->
+    <section class="flex items-center justify-between px-2">
+      <div class="text-sm text-muted-foreground">
+        Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+        {{ Math.min(currentPage * itemsPerPage, filteredCustomers.length) }} of 
+        {{ filteredCustomers.length }} customers
+      </div>
+      <div class="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="currentPage === 1"
+          @click="previousPage"
+        >
+          <ChevronLeft class="h-4 w-4" />
+          Previous
+        </Button>
+        
+        <div class="flex items-center gap-1">
+          <Button
+            v-for="page in totalPages"
+            :key="page"
+            variant="outline"
+            size="sm"
+            :class="[
+              'min-w-[40px]',
+              currentPage === page ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
+            ]"
+            @click="goToPage(page)"
+          >
+            {{ page }}
+          </Button>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="currentPage === totalPages"
+          @click="nextPage"
+        >
+          Next
+          <ChevronRight class="h-4 w-4" />
+        </Button>
+      </div>
+    </section>
   </div>
 </template>

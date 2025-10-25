@@ -9,20 +9,15 @@ const seedCustomers = [
     emailAddress: 'isabella.cortez@example.com',
     loyaltyStatus: 'Loyal',
     totalVehicles: 4
-  }
+  },
+  
 ]
 
 export const useCustomersStore = defineStore('customers', () => {
   const customers = ref([...seedCustomers])
 
   const addCustomer = (customer) => {
-    customers.value = [
-      ...customers.value,
-      {
-        ...customer,
-        loyaltyStatus: customer.loyaltyStatus === 'Loyal' ? 'Loyal' : 'Regular'
-      }
-    ]
+    customers.value.push(customer)
   }
 
   return {
