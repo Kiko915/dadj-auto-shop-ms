@@ -77,3 +77,22 @@ model UserSession {
   @@index([token])
   @@map("user_sessions")
 }
+
+model Customer {
+  id            String   @id @default(cuid()) @map("customer_id")
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  phoneNumber   String   @map("phone_number")
+  email         String?  @unique
+  notes         String?  @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  loyaltyStatus String   @default("regular") @map("loyalty_status") // regular, silver, gold, platinum
+  serviceCount  Int      @default(0) @map("service_count")
+  totalSpent    Decimal  @default(0) @db.Decimal(10, 2) @map("total_spent")
+  
+  dateCreated   DateTime @default(now()) @map("date_created")
+  lastModified  DateTime @updatedAt @map("last_modified")
+
+  @@map("customers")
+}
+
