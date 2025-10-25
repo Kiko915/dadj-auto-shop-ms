@@ -1,4 +1,4 @@
-// routes/customer.js - RESTful API for Customer Profile
+// routes/customer.js - RESTful API for Customer Profile Management
 
 import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
@@ -7,23 +7,18 @@ import prisma from '../db.js';
 const router = express.Router();
 
 /**
- * @route POST /api/customers/add-customer
+ * @route POST /api/customers
  * @desc Add a new customer profile
  * @access Staff, Admin
- * @body {string} id - The unique customer ID (cuid)
- * @returns {object} Confirmation of deletion or error message
+ * @returns {201} { message: string, newCustomer: Object } - Customer created successfully
+ * @returns {400} { message: string, error: 'MISSING_FIELDS' } - Missing required fields
+ * @returns {409} { message: string, error: 'DUPLICATE_EMAIL' } - Email already exists
+ * @returns {500} { message: string, error: 'CUSTOMER_ERROR' } - Failed to create customer
  */
-router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const {
-            firstName,
-            lastName,
-            phoneNumber,
-            email,
-            notes,
-            loyaltyStatus
-        } = req.body;
-        
+        const { firstName, lastName, phoneNumber, email, notes, loyaltyStatus } = req.body;
+
         // Input Validation
         if (!firstName || !lastName || !phoneNumber) {
             return res.status(400).json({
@@ -32,7 +27,7 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
             });
         }
 
-        // Creates the User
+        // Create Customer
         const newCustomer = await prisma.customer.create({
             data: {
                 firstName,
@@ -40,8 +35,8 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
                 phoneNumber,
                 email: email || null,
                 notes: notes || null,
-                loyaltyStatus: loyaltyStatus || 'regular'
-            }
+                loyaltyStatus: loyaltyStatus || 'regular',
+            },
         });
 
         return res.status(201).json({
@@ -51,7 +46,6 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
     } catch (error) {
         console.error('Add Customer Error:', error);
 
-        // Handle Prisma unique constraint errors (Duplicate email)
         if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
             return res.status(409).json({
                 message: 'Email address already exists',
@@ -59,82 +53,86 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
             });
         }
 
-        return res.status(500).json({ 
+        return res.status(500).json({
             message: 'Failed to create customer',
-            error: 'CUSTOMER_ERROR'
+            error: 'CUSTOMER_ERROR',
         });
     }
 });
 
 /**
- * @route POST /api/customers/delete-customer
- * @desc Delete an existing customer by ID
+ * @route GET /api/customers
+ * @desc Retrieve all customers from the database
  * @access Staff, Admin
- * @body {string} id - The unique customer ID (cuid)
- * @returns {object} Confirmation of deletion or error message
+ * @returns {200} { message: string, customers: Array } - Successfully retrieved customers
+ * @returns {500} { message: string, error: string } - Failed to fetch customers
  */
-router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { id } = req.body;
-
-        // Check if an ID is Provided
-        if (!id) {
-            return res.status(400).json({
-                message: 'Customer ID is required',
-                error: 'MISSING_ID',
-            });
-        }
-        
-        // Check if the user exist
-        const existing_customer = await prisma.customer.findUnique({
-            where: id
+        const customers = await prisma.customer.findMany({
+            orderBy: { lastModified: 'desc' },
         });
 
-        if (!existing_customer) {
+        return res.status(200).json({
+            message: 'Customers retrieved successfully',
+            customers,
+        });
+    } catch (error) {
+        console.error('Get Customers Error:', error);
+        return res.status(500).json({
+            message: 'Failed to fetch customers',
+            error: 'CUSTOMER_ERROR',
+        });
+    }
+});
+
+/**
+ * @route GET /api/customers/:id
+ * @desc Get a single customer by ID
+ * @access Staff, Admin
+ * @returns {200} { message: string, customer: Object } - Customer retrieved successfully
+ * @returns {404} { message: string, error: 'NOT_FOUND' } - Customer not found
+ * @returns {500} { message: string, error: string } - Failed to retrieve customer
+ */
+router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const customer = await prisma.customer.findUnique({ where: { id } });
+        if (!customer) {
             return res.status(404).json({
                 message: 'Customer not found',
                 error: 'NOT_FOUND',
             });
         }
 
-        // Delete the User
-        await prisma.customer.delete({
-            where: { id },
-        });
-
         return res.status(200).json({
-            message: 'Customer deleted successfully',
-            data: { id },
+            message: 'Customer retrieved successfully',
+            customer,
         });
     } catch (error) {
-        console.error('Delete Customer Error:', error);
-        res.status(500).json({ 
-            message: 'Failed to delete customer',
-            error: 'CUSTOMER_ERROR'
+        console.error('Get Customer Error:', error);
+        return res.status(500).json({
+            message: 'Failed to retrieve customer',
+            error: 'CUSTOMER_ERROR',
         });
     }
 });
 
 /**
- * @route POST api/customers/update-customer
+ * @route PUT /api/customers/:id
  * @desc Update an existing customer's information
  * @access Staff, Admin
- * @body {string} id - The unique customer ID (cuid)
- * @body {string} [firstName] - Updated first name
- * @body {string} [lastName] - Updated last name
- * @body {string} [phoneNumber] - Updated phone number
- * @body {string} [email] - Updated email (must remain unique)
- * @body {string} [notes] - Updated notes
- * @body {boolean} [isActive] - Active/inactive status
- * @body {string} [loyaltyStatus] - Updated loyalty status (regular, silver, gold, platinum)
- * @body {number} [serviceCount] - Updated service count
- * @body {number} [totalSpent] - Updated total amount spent
- * @returns {object} The updated customer record
+ * @returns {200} { message: string, updatedCustomer: Object } - Customer updated successfully
+ * @returns {400} { message: string, error: 'MISSING_ID' } - Missing ID
+ * @returns {404} { message: string, error: 'NOT_FOUND' } - Customer not found
+ * @returns {409} { message: string, error: 'DUPLICATE_EMAIL' } - Email already exists
+ * @returns {500} { message: string, error: string } - Failed to update customer
  */
-router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
+        const { id } = req.params;
         const {
-            id,
             firstName,
             lastName,
             phoneNumber,
@@ -143,22 +141,11 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             isActive,
             loyaltyStatus,
             serviceCount,
-            totalSpent
+            totalSpent,
         } = req.body;
 
-        // Check if an ID Is Provided
-        if (!id) {
-            return res.status(400).json({
-                message: 'Customer ID is required',
-                error: 'MISSING_ID',
-            });
-        }
-
-        // Check if the user exist
-        const existingCustomer = await prisma.customer.findUnique({
-            where: { id },
-        });
-
+        // Check if the customer exists
+        const existingCustomer = await prisma.customer.findUnique({ where: { id } });
         if (!existingCustomer) {
             return res.status(404).json({
                 message: 'Customer not found',
@@ -166,7 +153,7 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
 
-        // Update the necessary fields/given by the client
+        // Update Customer
         const updatedCustomer = await prisma.customer.update({
             where: { id },
             data: {
@@ -184,12 +171,11 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
 
         return res.status(200).json({
             message: 'Customer updated successfully',
-            data: updatedCustomer,
+            updatedCustomer,
         });
     } catch (error) {
         console.error('Update Customer Error:', error);
 
-        // Handle unique constraint (duplicate email)
         if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
             return res.status(409).json({
                 message: 'Email address already exists',
@@ -197,63 +183,44 @@ router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'adm
             });
         }
 
-        res.status(500).json({ 
+        return res.status(500).json({
             message: 'Failed to update customer',
-            error: 'CUSTOMER_ERROR'
+            error: 'CUSTOMER_ERROR',
         });
     }
 });
 
 /**
- * @route GET /api/customers
- * @desc Retrieve customers from the database. If an ID is provided, fetch a single customer; otherwise, return all customers.
+ * @route DELETE /api/customers/:id
+ * @desc Delete a customer by ID
  * @access Staff, Admin
- * @query {string} [id] - Optional customer ID to fetch a specific record
- * @returns {object|array} Customer data or a list of all customers
- * @example
- * // Get all customers
- * GET /customers
- * 
- * // Get one customer
- * GET /customers?id=clxyz123456789
+ * @returns {200} { message: string, deletedCustomer: Object } - Customer deleted successfully
+ * @returns {404} { message: string, error: 'NOT_FOUND' } - Customer not found
+ * @returns {500} { message: string, error: string } - Failed to delete customer
  */
-router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { id } = req.query;
+        const { id } = req.params;
 
-        if (id) {
-            // Fetch Single Customer
-            const customer = await prisma.customer.findUnique({
-                where: id,
-            });
-
-            if (!customer) {
-                return res.status(404).json({
-                    message: 'Customer not Found',
-                    error: 'CUSTOMER_NOT_FOUND'
-                })
-            }
-
-            return res.status(200).json({
-                message: 'Customer retrieved successfully',
-                customer
-            });
-        } else {
-            // Fetch all customer
-            const customers = await prisma.customer.findMany({
-                orderBy: { lastModified: 'desc' }
-            });
-
-            return res.status(500).json({
-                message: 'Customers retrieved successfully',
-                customers
+        const existingCustomer = await prisma.customer.findUnique({ where: { id } });
+        if (!existingCustomer) {
+            return res.status(404).json({
+                message: 'Customer not found',
+                error: 'NOT_FOUND',
             });
         }
+
+        const deletedCustomer = await prisma.customer.delete({ where: { id } });
+
+        return res.status(200).json({
+            message: 'Customer deleted successfully',
+            deletedCustomer,
+        });
     } catch (error) {
-        console.error('Get Customer Error:', error);
+        console.error('Delete Customer Error:', error);
         return res.status(500).json({
-            message: 'Failed to fetch customers',
-            error: 'CUSTOMER_ERROR'
+            message: 'Failed to delete customer',
+            error: 'CUSTOMER_ERROR',
         });
     }
 });
