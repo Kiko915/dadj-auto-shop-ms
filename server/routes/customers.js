@@ -13,14 +13,49 @@ const router = express.Router();
  */
 router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        // TODO: Implement database insertion logic
-        res.status(501).json({
-            message: 'TODO: Aron - implement add customer logic',
-            error: 'NOT_IMPLEMENTED',
+        const {
+            firstName,
+            lastName,
+            phoneNumber,
+            email,
+            notes,
+            loyaltyStatus
+        } = req.body;
+
+        if (!firstName || !lastName || !phoneNumber) {
+            return res.status(400).json({
+                message: 'Missing required fields: firstName, lastName, and phoneNumber are required',
+                error: 'MISSING_FIELDS',
+            });
+        }
+
+        const newCustomer = await prisma.customer.create({
+            data: {
+                firstName,
+                lastName,
+                phoneNumber,
+                email: email || null,
+                notes: notes || null,
+                loyaltyStatus: loyaltyStatus || 'regular'
+            }
+        });
+
+        return res.status(201).json({
+            message: 'Customer added successfully',
+            data: newCustomer,
         });
     } catch (error) {
         console.error('Add Customer Error:', error);
-        res.status(500).json({ 
+
+        // Handle Prisma unique constraint errors (Duplicate email)
+        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+            return res.status(409).json({
+                message: 'Email address already exists',
+                error: 'DUPLICATE_EMAIL',
+            });
+        }
+
+        return res.status(500).json({ 
             message: 'Failed to create customer',
             error: 'CUSTOMER_ERROR'
         });
@@ -34,10 +69,32 @@ router.post('/add-customer', authenticateToken, authorizeRoles(['staff', 'admin'
  */
 router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        // TODO: Implement deletion logic (e.g. prisma.customer.delete)
-        res.status(501).json({
-            message: 'TODO: Aron - implement delete customer logic',
-            error: 'NOT_IMPLEMENTED',
+        const { id } = req.body;
+        if (!id) {
+            return res.status(400).json({
+                message: 'Customer ID is required',
+                error: 'MISSING_ID',
+            });
+        }
+        
+        const existing_customer = await prisma.customer.findUnique({
+            where: id
+        });
+
+        if (!existing_customer) {
+            return res.status(404).json({
+                message: 'Customer not found',
+                error: 'NOT_FOUND',
+            });
+        }
+
+        await prisma.customer.delete({
+            where: { id },
+        });
+
+        return res.status(200).json({
+            message: 'Customer deleted successfully',
+            data: { id },
         });
     } catch (error) {
         console.error('Delete Customer Error:', error);
@@ -55,13 +112,67 @@ router.post('/delete-customer', authenticateToken, authorizeRoles(['staff', 'adm
  */
 router.post('/update-customer', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        // TODO: Implement update logic (e.g. prisma.customer.update)
-        res.status(501).json({
-            message: 'TODO: Aron - implement update customer logic',
-            error: 'NOT_IMPLEMENTED',
+        const {
+            id,
+            firstName,
+            lastName,
+            phoneNumber,
+            email,
+            notes,
+            isActive,
+            loyaltyStatus,
+            serviceCount,
+            totalSpent
+        } = req.body;
+
+        if (!id) {
+            return res.status(400).json({
+                message: 'Customer ID is required',
+                error: 'MISSING_ID',
+            });
+        }
+
+        const existingCustomer = await prisma.customer.findUnique({
+            where: { id },
+        });
+
+        if (!existingCustomer) {
+            return res.status(404).json({
+                message: 'Customer not found',
+                error: 'NOT_FOUND',
+            });
+        }
+
+        const updatedCustomer = await prisma.customer.update({
+            where: { id },
+            data: {
+                ...(firstName && { firstName }),
+                ...(lastName && { lastName }),
+                ...(phoneNumber && { phoneNumber }),
+                ...(email && { email }),
+                ...(notes && { notes }),
+                ...(typeof isActive === 'boolean' && { isActive }),
+                ...(loyaltyStatus && { loyaltyStatus }),
+                ...(typeof serviceCount === 'number' && { serviceCount }),
+                ...(typeof totalSpent === 'number' && { totalSpent }),
+            },
+        });
+
+        return res.status(200).json({
+            message: 'Customer updated successfully',
+            data: updatedCustomer,
         });
     } catch (error) {
         console.error('Update Customer Error:', error);
+
+        // Handle unique constraint (duplicate email)
+        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+            return res.status(409).json({
+                message: 'Email address already exists',
+                error: 'DUPLICATE_EMAIL',
+            });
+        }
+
         res.status(500).json({ 
             message: 'Failed to update customer',
             error: 'CUSTOMER_ERROR'
@@ -79,21 +190,35 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
         const { id } = req.query;
 
         if (id) {
-            // TODO: Implement single customer retrieval
-            res.status(501).json({
-                message: 'TODO: Aron - implement get single customer logic',
-                error: 'NOT_IMPLEMENTED',
+            const customer = await prisma.customer.findUnique({
+                where: id,
+            });
+
+            if (!customer) {
+                return res.status(404).json({
+                    message: 'Customer not Found',
+                    error: 'CUSTOMER_NOT_FOUND'
+                })
+            }
+
+            return res.status(200).json({
+                message: 'Customer retrieved successfully',
+                customer
             });
         } else {
-            // TODO: Implement all customers retrieval
-            res.status(501).json({
-                message: 'TODO: Aron - implement get all customers logic',
-                error: 'NOT_IMPLEMENTED',
+            // TODO: Fetch all customer
+            const customers = await prisma.customer.findMany({
+                orderBy: { lastModified: 'desc' }
+            });
+
+            return res.status(500).json({
+                message: 'Customers retrieved successfully',
+                customers
             });
         }
     } catch (error) {
         console.error('Get Customer Error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             message: 'Failed to fetch customers',
             error: 'CUSTOMER_ERROR'
         });
