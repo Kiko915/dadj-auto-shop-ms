@@ -60,9 +60,15 @@ const router = createRouter({
         //   name: 'vehicles',
         //   component: () => import('@/pages/dashboard/Vehicles.vue'),
         // },
-        {path: 'customers',
+        {
+          path: 'customers',
           name: 'customers',
           component: () => import('@/pages/dashboard/Customer.vue'),
+        },
+        {
+          path: 'customers/add-customer',
+          name: 'add-customer',
+          component: () => import('@/pages/dashboard/customers/AddCustomers.vue'),
         }
       ]
     },

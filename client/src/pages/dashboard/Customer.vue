@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { Search, Star } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,6 +84,7 @@ const filteredCustomers = computed(() => {
   const filtered = customers.value.filter((customer) => {
     if (!query) return true
     const haystack = [
+      customer.id,
       customer.name,
       customer.phoneNumber,
       customer.emailAddress,
@@ -105,6 +106,7 @@ const filteredCustomers = computed(() => {
 const viewProfile = (id: string) => {
   router.push({ path: `/dashboard/customers/${id}` })
 }
+
 </script>
 
 <template>
@@ -117,7 +119,7 @@ const viewProfile = (id: string) => {
     </header>
 
     <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div class="relative w-full md:max-w-sm">
+      <div class="relative w-full md:max-w-2xl">
         <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           v-model="searchQuery"
@@ -125,27 +127,35 @@ const viewProfile = (id: string) => {
           class="pl-10"
         />
       </div>
-      <Select v-model="sortOrder">
-        <SelectTrigger class="md:w-[200px]">
-          <SelectValue placeholder="Sort by" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="asc">Name (A → Z)</SelectItem>
-          <SelectItem value="desc">Name (Z → A)</SelectItem>
-        </SelectContent>
-      </Select>
+      <div class="flex flex-col items-stretch gap-2 md:w-auto">
+        <Button asChild variant="secondary" class="md:w-[200px]">
+          <RouterLink :to="{ name: 'add-customer' }">
+            Add Customer
+          </RouterLink>
+        </Button>
+        <Select v-model="sortOrder">
+          <SelectTrigger class="md:w-[200px]">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="asc">Name (A → Z)</SelectItem>
+            <SelectItem value="desc">Name (Z → A)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </section>
 
-    <section class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <Table>
+    <section class="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+      <Table class="text-base">
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Phone Number</TableHead>
-            <TableHead>Email Address</TableHead>
-            <TableHead>Loyalty Status</TableHead>
-            <TableHead class="text-right">Total Vehicles</TableHead>
-            <TableHead class="text-right">Action</TableHead>
+            <TableHead class="h-12 px-4 text-base">Customer ID</TableHead>
+            <TableHead class="h-12 px-4 text-base">Name</TableHead>
+            <TableHead class="h-12 px-4 text-base">Phone Number</TableHead>
+            <TableHead class="h-12 px-4 text-base">Email Address</TableHead>
+            <TableHead class="h-12 px-4 text-base">Loyalty Status</TableHead>
+            <TableHead class="h-12 px-4 text-right text-base">Total Vehicles</TableHead>
+            <TableHead class="h-12 px-4 text-right text-base">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody v-if="filteredCustomers.length">
@@ -154,10 +164,11 @@ const viewProfile = (id: string) => {
             :key="customer.id"
             class="hover:bg-muted/50"
           >
-            <TableCell class="font-medium">{{ customer.name }}</TableCell>
-            <TableCell>{{ customer.phoneNumber }}</TableCell>
-            <TableCell>{{ customer.emailAddress }}</TableCell>
-            <TableCell>
+            <TableCell class="p-4 font-medium">{{ customer.id }}</TableCell>
+            <TableCell class="p-4 font-medium">{{ customer.name }}</TableCell>
+            <TableCell class="p-4">{{ customer.phoneNumber }}</TableCell>
+            <TableCell class="p-4">{{ customer.emailAddress }}</TableCell>
+            <TableCell class="p-4">
               <Badge
                 v-if="customer.loyaltyStatus === 'Loyal'"
                 variant="secondary"
@@ -174,8 +185,8 @@ const viewProfile = (id: string) => {
                 {{ customer.loyaltyStatus.toLowerCase() }}
               </Badge>
             </TableCell>
-            <TableCell class="text-right">{{ customer.totalVehicles }}</TableCell>
-            <TableCell class="text-right">
+            <TableCell class="p-4 text-right">{{ customer.totalVehicles }}</TableCell>
+            <TableCell class="p-4 text-right">
               <Button
                 type="button"
                 variant="outline"
@@ -189,7 +200,7 @@ const viewProfile = (id: string) => {
         </TableBody>
         <TableBody v-else>
           <TableRow>
-            <TableCell colspan="6" class="py-10 text-center text-sm text-muted-foreground">
+            <TableCell colspan="7" class="p-10 text-center text-sm text-muted-foreground">
               No customers found. Adjust your filters and try again.
             </TableCell>
           </TableRow>
