@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { Search, Star } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+import { Search, Star, Plus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { useCustomersStore } from '@/stores/customers'
 
 type Customer = {
   id: string
@@ -31,52 +33,13 @@ type Customer = {
 }
 
 const router = useRouter()
-
-const customers = ref<Customer[]>([
-  {
-    id: 'cust-1',
-    name: 'Isabella Cortez',
-    phoneNumber: '+63 917 555 2101',
-    emailAddress: 'isabella.cortez@example.com',
-    loyaltyStatus: 'Loyal',
-    totalVehicles: 4
-  },
-  {
-    id: 'cust-2',
-    name: 'Miguel Dizon',
-    phoneNumber: '+63 927 884 0023',
-    emailAddress: 'miguel.dizon@example.com',
-    loyaltyStatus: 'Regular',
-    totalVehicles: 2
-  },
-  {
-    id: 'cust-3',
-    name: 'Rafael Dominguez',
-    phoneNumber: '+63 905 778 4419',
-    emailAddress: 'rafael.dominguez@example.com',
-    loyaltyStatus: 'Loyal',
-    totalVehicles: 5
-  },
-  {
-    id: 'cust-4',
-    name: 'Clarissa Yap',
-    phoneNumber: '+63 936 112 7750',
-    emailAddress: 'clarissa.yap@example.com',
-    loyaltyStatus: 'Regular',
-    totalVehicles: 1
-  },
-  {
-    id: 'cust-5',
-    name: 'Noah Mercado',
-    phoneNumber: '+63 917 444 9034',
-    emailAddress: 'noah.mercado@example.com',
-    loyaltyStatus: 'Loyal',
-    totalVehicles: 3
-  }
-])
+const customersStore = useCustomersStore()
+const { customers } = storeToRefs(customersStore)
 
 const searchQuery = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+const currentPage = ref(1)
+const itemsPerPage = 10
 
 const filteredCustomers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -103,6 +66,32 @@ const filteredCustomers = computed(() => {
   })
 })
 
+const totalPages = computed(() => Math.ceil(filteredCustomers.value.length / itemsPerPage))
+
+const paginatedCustomers = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredCustomers.value.slice(start, end)
+})
+
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
+
+const previousPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+  }
+}
+
 const viewProfile = (id: string) => {
   router.push({ path: `/dashboard/customers/${id}` })
 }
@@ -128,8 +117,9 @@ const viewProfile = (id: string) => {
         />
       </div>
       <div class="flex flex-col items-stretch gap-2 md:w-auto">
-        <Button asChild variant="secondary" class="md:w-[200px]">
+        <Button asChild variant="primary" class="md:w-[200px]">
           <RouterLink :to="{ name: 'add-customer' }">
+            <Plus class="mr-2 h-4 w-4" />
             Add Customer
           </RouterLink>
         </Button>
@@ -158,9 +148,9 @@ const viewProfile = (id: string) => {
             <TableHead class="h-12 px-4 text-right text-base">Action</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-if="filteredCustomers.length">
+        <TableBody v-if="paginatedCustomers.length">
           <TableRow
-            v-for="customer in filteredCustomers"
+            v-for="customer in paginatedCustomers"
             :key="customer.id"
             class="hover:bg-muted/50"
           >
