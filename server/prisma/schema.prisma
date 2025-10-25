@@ -71,5 +71,39 @@ model Customer {
   dateCreated   DateTime @default(now()) @map("date_created")
   lastModified  DateTime @updatedAt @map("last_modified")
 
+  // Relations
+  vehicles      Vehicle[]
+
   @@map("customers")
+}
+
+enum VehicleType {
+  Sedan
+  SUV
+  Truck
+  Van
+  Tricycle
+  Motorcycle
+  Jeepney
+
+}
+
+model Vehicle {
+  id            String       @id @default(cuid()) @map("vehicle_id")
+  customerId    String       @map("customer_id")
+  licensePlate  String       @unique @map("license_plate") @db.VarChar(20)
+  make          String       @db.VarChar(100)
+  model         String       @db.VarChar(100)
+  year          Int?
+  vin           String?      @unique @db.VarChar(17)
+  mileage       Int?
+  vehicleType   VehicleType? @map("vehicle_type")
+  notes         String?      @db.Text
+  dateRegistered DateTime    @default(now()) @map("date_registered")
+  
+  // Relations
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("vehicles")
 }
