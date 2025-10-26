@@ -29,6 +29,7 @@
     "express": "^5.1.0",
     "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.1.6",
     "nodemailer": "^7.0.9"
   },
   "devDependencies": {

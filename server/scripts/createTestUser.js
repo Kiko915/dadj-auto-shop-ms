@@ -9,9 +9,9 @@ async function createTestUser() {
     // Create test user
     const user = await prisma.user.create({
       data: {
-        email: 'francismistica06@gmail.com',
+        email: 'carlhenrik.cipriano@gmail.com',
         password: hashedPassword,
-        role: 'STAFF',
+        role: 'staff',
         isActive: true
       }
     });
@@ -24,7 +24,7 @@ async function createTestUser() {
     });
     
     console.log('You can now login with:');
-    console.log('Email: test@synera.com');
+    console.log('Email: ', user.email);
     console.log('Password: password123');
     
   } catch (error) {
