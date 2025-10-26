@@ -3,6 +3,7 @@
 import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import prisma from '../db.js';
+import { generateCustomerId } from '../utils/generateId.js';
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
         // Create Customer
         const newCustomer = await prisma.customer.create({
             data: {
+                id: generateCustomerId(), // Generate custom ID with cust- prefix
                 firstName,
                 lastName,
                 phoneNumber,

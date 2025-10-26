@@ -3,6 +3,7 @@
 import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import prisma from '../db.js';
+import { generateVehicleId } from '../utils/generateId.js';
 
 const router = express.Router();
 
@@ -90,6 +91,7 @@ router.post('/customer/:customerId', authenticateToken, authorizeRoles(['staff',
         // Create Vehicle
         const newVehicle = await prisma.vehicle.create({
             data: {
+                id: generateVehicleId(), // Generate custom ID with veh- prefix
                 customerId,
                 licensePlate,
                 make,
