@@ -20,6 +20,7 @@ import { useCustomersStore } from '@/stores/customers'
 import ProfilePictureUpload from '@/components/views/customer-form/ProfilePictureUpload.vue'
 import ContactInfoSection from '@/components/views/customer-form/ContactInfoSection.vue'
 import AccountDetailsSection from '@/components/views/customer-form/AccountDetailsSection.vue'
+import CustomerReviewDialog from '@/components/views/customer-form/CustomerReviewDialog.vue'
 
 type FormState = {
   firstName: string
@@ -39,6 +40,7 @@ const router = useRouter()
 const customersStore = useCustomersStore()
 const isSubmitting = ref(false)
 const showDiscardDialog = ref(false)
+const showConfirmDialog = ref(false)
 
 // Load saved form data from localStorage on mount
 const loadSavedFormData = (): Partial<FormState> | null => {
@@ -289,7 +291,13 @@ const handleSubmit = async () => {
     return
   }
 
+  // Show confirmation dialog instead of submitting immediately
+  showConfirmDialog.value = true
+}
+
+const confirmSubmit = async () => {
   isSubmitting.value = true
+  showConfirmDialog.value = false
 
   // Simulate API call
   await new Promise(resolve => setTimeout(resolve, 1500))
@@ -308,12 +316,12 @@ const handleSubmit = async () => {
 
   customersStore.addCustomer(payload)
   
-  const fullName = [payload.firstName, payload.middleName, payload.lastName, payload.suffix]
+  const fullNameDisplay = [payload.firstName, payload.middleName, payload.lastName, payload.suffix]
     .filter(Boolean)
     .join(' ')
   
   toast.success('Customer added successfully! 🎉', {
-    description: `${fullName} has been added to your customer list.`
+    description: `${fullNameDisplay} has been added to your customer list.`
   })
 
   // Clear localStorage after successful submission
@@ -322,6 +330,10 @@ const handleSubmit = async () => {
   isSubmitting.value = false
   router.push({ name: 'customers' })
   resetForm()
+}
+
+const cancelSubmit = () => {
+  showConfirmDialog.value = false
 }
 
 const handleCancel = () => {
@@ -599,5 +611,14 @@ const cancelDiscard = () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Confirmation Dialog -->
+    <CustomerReviewDialog
+      v-model:open="showConfirmDialog"
+      :is-submitting="isSubmitting"
+      :customer-data="form"
+      @confirm="confirmSubmit"
+      @cancel="cancelSubmit"
+    />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Upload, X, CheckCircle, User } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 interface Props {
   name: string
   error?: string
+  modelValue?: string | null
 }
 
 const props = defineProps<Props>()
@@ -20,8 +21,18 @@ const emit = defineEmits<{
 }>()
 
 const profileImageFile = ref<File | null>(null)
-const profileImagePreview = ref<string | null>(null)
+const profileImagePreview = ref<string | null>(props.modelValue || null)
 const isDragging = ref(false)
+
+// Watch for external changes to modelValue (e.g., from localStorage)
+watch(() => props.modelValue, (newValue) => {
+  if (newValue) {
+    profileImagePreview.value = newValue
+  } else {
+    profileImagePreview.value = null
+    profileImageFile.value = null
+  }
+}, { immediate: true })
 
 const getInitials = computed(() => {
   const names = props.name.trim().split(' ')
