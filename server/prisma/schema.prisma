@@ -82,6 +82,8 @@ model Customer {
   id            String   @id @default(cuid()) @map("customer_id")
   firstName     String   @map("first_name")
   lastName      String   @map("last_name")
+  middleName    String?  @map("middle_name")
+  suffix        String?
   phoneNumber   String   @map("phone_number")
   email         String?  @unique
   notes         String?  @db.Text
