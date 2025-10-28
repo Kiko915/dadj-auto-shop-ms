@@ -11,20 +11,51 @@ const router = express.Router();
  * @route POST /api/customers
  * @desc Add a new customer profile
  * @access Staff, Admin
- * @returns {201} { message: string, newCustomer: Object } - Customer created successfully
+ * @body {string} firstName - Customer's first name (required)
+ * @body {string} lastName - Customer's last name (required)
+ * @body {string} [middleName] - Customer's middle name (optional)
+ * @body {string} [suffix] - Customer's suffix (optional)
+ * @body {string} phoneNumber - Customer's phone number (required)
+ * @body {string} email - Customer's email address (required)
+ * @body {string} [profilePicture] - ImageKit URL for profile picture (optional)
+ * @body {string} [loyaltyStatus] - Loyalty status (optional, defaults to 'regular')
+ * @body {number} [totalVehicles] - Total vehicles owned (optional, defaults to 0)
+ * @body {string} [notes] - Additional notes (optional)
+ * @returns {201} { message: string, customer: Object } - Customer created successfully
  * @returns {400} { message: string, error: 'MISSING_FIELDS' } - Missing required fields
+ * @returns {400} { message: string, error: 'INVALID_EMAIL' } - Invalid email format
  * @returns {409} { message: string, error: 'DUPLICATE_EMAIL' } - Email already exists
  * @returns {500} { message: string, error: 'CUSTOMER_ERROR' } - Failed to create customer
  */
 router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { firstName, lastName, phoneNumber, email, notes, loyaltyStatus } = req.body;
+        const { 
+            firstName, 
+            lastName, 
+            middleName, 
+            suffix, 
+            phoneNumber, 
+            email, 
+            profilePicture,
+            notes, 
+            loyaltyStatus,
+            totalVehicles 
+        } = req.body;
 
         // Input Validation
-        if (!firstName || !lastName || !phoneNumber) {
+        if (!firstName || !lastName || !phoneNumber || !email) {
             return res.status(400).json({
-                message: 'Missing required fields: firstName, lastName, and phoneNumber are required',
+                message: 'Missing required fields: firstName, lastName, phoneNumber, and email are required',
                 error: 'MISSING_FIELDS',
+            });
+        }
+
+        // Validate email format
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+        if (!emailPattern.test(email)) {
+            return res.status(400).json({
+                message: 'Invalid email format',
+                error: 'INVALID_EMAIL',
             });
         }
 
@@ -34,16 +65,20 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 id: generateCustomerId(), // Generate custom ID with cust- prefix
                 firstName,
                 lastName,
+                middleName: middleName || null,
+                suffix: suffix || null,
                 phoneNumber,
-                email: email || null,
+                email,
+                profilePicture: profilePicture || null,
                 notes: notes || null,
                 loyaltyStatus: loyaltyStatus || 'regular',
+                totalVehicles: totalVehicles ? parseInt(totalVehicles) : 0,
             },
         });
 
         return res.status(201).json({
             message: 'Customer added successfully',
-            newCustomer,
+            customer: newCustomer,
         });
     } catch (error) {
         console.error('Add Customer Error:', error);

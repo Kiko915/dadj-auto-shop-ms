@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useCustomersStore } from '@/stores/customers'
+import { createCustomer } from '@/api/customers'
 import ProfilePictureUpload from '@/components/views/customer-form/ProfilePictureUpload.vue'
 import ContactInfoSection from '@/components/views/customer-form/ContactInfoSection.vue'
 import AccountDetailsSection from '@/components/views/customer-form/AccountDetailsSection.vue'
@@ -37,7 +37,6 @@ type FormState = {
 const STORAGE_KEY = 'addCustomerFormDraft'
 
 const router = useRouter()
-const customersStore = useCustomersStore()
 const isSubmitting = ref(false)
 const showDiscardDialog = ref(false)
 const showConfirmDialog = ref(false)
@@ -82,32 +81,13 @@ const resetForm = () => {
 // Save form data to localStorage whenever it changes
 const saveFormToLocalStorage = () => {
   try {
-    // Create a copy of form data
+    // Since profilePicture is now an ImageKit URL (not Base64), it's much smaller
+    // No need to worry about size limitations
     const dataToSave = { ...form }
-    
-    // Check the size of the data
-    const dataString = JSON.stringify(dataToSave)
-    const sizeInBytes = new Blob([dataString]).size
-    const sizeInMB = sizeInBytes / (1024 * 1024)
-    
-    // If data is too large (>4MB), save without profile picture
-    if (sizeInMB > 4) {
-      const dataWithoutImage = { ...form, profilePicture: null }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataWithoutImage))
-      console.warn('Profile picture excluded from draft due to size limitations')
-    } else {
-      localStorage.setItem(STORAGE_KEY, dataString)
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
   } catch (error) {
-    // If still fails (QuotaExceededError), try saving without profile picture
     if (error instanceof Error && error.name === 'QuotaExceededError') {
-      try {
-        const dataWithoutImage = { ...form, profilePicture: null }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataWithoutImage))
-        console.warn('Profile picture excluded from draft due to storage quota')
-      } catch (fallbackError) {
-        console.error('Failed to save form data even without image:', fallbackError)
-      }
+      console.error('Failed to save form data: Storage quota exceeded')
     } else {
       console.error('Failed to save form data:', error)
     }
@@ -138,16 +118,9 @@ onMounted(() => {
     if (hasData) {
       Object.assign(form, savedData)
       
-      // Show different message if profile picture wasn't saved
-      if (savedData.profilePicture) {
-        toast.info('Draft Restored', {
-          description: 'Your previous form data has been restored.'
-        })
-      } else {
-        toast.info('Draft Restored', {
-          description: 'Your previous form data has been restored. Note: Profile picture was not saved due to size limitations.'
-        })
-      }
+      toast.info('Draft Restored', {
+        description: 'Your previous form data has been restored.'
+      })
     }
   }
 })
@@ -299,37 +272,63 @@ const confirmSubmit = async () => {
   isSubmitting.value = true
   showConfirmDialog.value = false
 
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1500))
+  try {
+    const payload = {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      middleName: form.middleName.trim() || undefined,
+      suffix: form.suffix.trim() || undefined,
+      phoneNumber: form.phoneNumber.trim(),
+      email: form.email.trim(),
+      loyaltyStatus: form.loyaltyStatus,
+      totalVehicles: Number(form.totalVehicles),
+      profilePicture: form.profilePicture || undefined
+    }
 
-  const payload = {
-    firstName: form.firstName.trim(),
-    lastName: form.lastName.trim(),
-    middleName: form.middleName.trim() || undefined,
-    suffix: form.suffix.trim() || undefined,
-    phoneNumber: form.phoneNumber.trim(),
-    email: form.email.trim(),
-    loyaltyStatus: form.loyaltyStatus,
-    totalVehicles: Number(form.totalVehicles),
-    profilePicture: form.profilePicture
+    // Call the backend API
+    const response = await createCustomer(payload)
+    
+    const fullNameDisplay = [payload.firstName, payload.middleName, payload.lastName, payload.suffix]
+      .filter(Boolean)
+      .join(' ')
+    
+    toast.success('Customer added successfully! 🎉', {
+      description: `${fullNameDisplay} has been added to your customer list.`
+    })
+
+    // Clear localStorage after successful submission
+    clearSavedFormData()
+
+    isSubmitting.value = false
+    resetForm()
+    router.push({ name: 'customers' })
+  } catch (error) {
+    isSubmitting.value = false
+    
+    // Handle specific error cases
+    if (error.response?.data?.error === 'DUPLICATE_EMAIL') {
+      toast.error('Email Already Exists', {
+        description: 'A customer with this email address already exists.'
+      })
+      errors.email = 'This email is already registered'
+      touched.email = true
+    } else if (error.response?.data?.error === 'MISSING_FIELDS') {
+      toast.error('Validation Error', {
+        description: 'Please fill in all required fields.'
+      })
+    } else if (error.response?.data?.error === 'INVALID_EMAIL') {
+      toast.error('Invalid Email', {
+        description: 'Please enter a valid email address.'
+      })
+      errors.email = 'Invalid email format'
+      touched.email = true
+    } else {
+      console.error('Customer Creation Error:', error)
+      toast.error('Failed to Add Customer', {
+        description: error.response?.data?.message || 'An unexpected error occurred. Please try again.'
+      })
+    }
   }
-
-  customersStore.addCustomer(payload)
-  
-  const fullNameDisplay = [payload.firstName, payload.middleName, payload.lastName, payload.suffix]
-    .filter(Boolean)
-    .join(' ')
-  
-  toast.success('Customer added successfully! 🎉', {
-    description: `${fullNameDisplay} has been added to your customer list.`
-  })
-
-  // Clear localStorage after successful submission
-  clearSavedFormData()
-
-  isSubmitting.value = false
-  router.push({ name: 'customers' })
-  resetForm()
 }
 
 const cancelSubmit = () => {
