@@ -86,7 +86,7 @@ model Customer {
   suffix        String?
   phoneNumber   String   @map("phone_number")
   email         String?  @unique
-  profilePicture String? @map("profile_picture") // ImageKit URL
+  profilePicture String? @map("customer_profile_picture") // ImageKit URL
   notes         String?  @db.Text
   isActive      Boolean  @default(true) @map("is_active")
   loyaltyStatus String   @default("regular") @map("loyalty_status") // regular, silver, gold, platinum

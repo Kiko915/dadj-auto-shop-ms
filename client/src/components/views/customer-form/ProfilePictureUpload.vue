@@ -20,6 +20,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   'update:modelValue': [value: string | null]
   'update:error': [error: string]
+  'update:fileId': [fileId: string | null]
 }>()
 
 const profileImageFile = ref<File | null>(null)
@@ -122,9 +123,10 @@ const uploadToImageKit = async (file: File) => {
 
     const uploadData = await uploadResponse.json()
 
-    // Update preview with ImageKit URL
+    // Update preview with ImageKit URL and emit fileId for cleanup tracking
     profileImagePreview.value = uploadData.url
     emit('update:modelValue', uploadData.url)
+    emit('update:fileId', uploadData.fileId) // Emit fileId for cleanup tracking
 
     toast.success('Image Uploaded', {
       description: 'Profile picture uploaded successfully'
@@ -149,6 +151,7 @@ const removeProfilePicture = () => {
   profileImageFile.value = null
   profileImagePreview.value = null
   emit('update:modelValue', null)
+  emit('update:fileId', null) // Clear fileId when removing picture
   emit('update:error', '')
 }
 </script>
@@ -184,7 +187,7 @@ const removeProfilePicture = () => {
             <Upload v-else class="mb-4 h-10 w-10 text-muted-foreground" />
             <div class="text-center">
               <p v-if="isUploading" class="mb-2 text-sm font-medium">
-                Uploading to ImageKit...
+                Uploading the image...
               </p>
               <p v-else class="mb-2 text-sm font-medium">
                 Drag and drop your image here, or

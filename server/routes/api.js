@@ -146,6 +146,49 @@ router.get('/imagekit-auth', authenticateToken, async (req, res) => {
 });
 
 /**
+ * @route DELETE /api/imagekit/delete/:fileId
+ * @description Delete a file from ImageKit by fileId
+ * @access Private
+ * @param {string} fileId - The ImageKit file ID to delete
+ */
+router.delete('/imagekit/delete/:fileId', authenticateToken, async (req, res) => {
+    try {
+        const { fileId } = req.params;
+
+        if (!fileId) {
+            return res.status(400).json({
+                error: 'MISSING_FILE_ID',
+                message: 'fileId is required'
+            });
+        }
+
+        // Delete file from ImageKit
+        await imagekit.deleteFile(fileId);
+
+        res.status(200).json({
+            message: 'File deleted successfully',
+            fileId
+        });
+    } catch (error) {
+        console.error('ImageKit delete error:', error);
+        
+        // Check if error is due to file not found (already deleted or doesn't exist)
+        if (error.message?.includes('No such file exists') || error.statusCode === 404) {
+            return res.status(404).json({
+                error: 'FILE_NOT_FOUND',
+                message: 'File does not exist or has already been deleted'
+            });
+        }
+
+        res.status(500).json({
+            error: 'DELETE_FAILED',
+            message: 'Failed to delete file from ImageKit',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
+/**
  * @route PATCH /api/user/profile-picture
  * @description Update user's profile picture URL
  * @access Private

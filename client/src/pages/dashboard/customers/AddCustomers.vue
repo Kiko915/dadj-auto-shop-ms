@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { CheckCircle, Loader2, AlertTriangle } from 'lucide-vue-next'
@@ -21,6 +21,7 @@ import ProfilePictureUpload from '@/components/views/customer-form/ProfilePictur
 import ContactInfoSection from '@/components/views/customer-form/ContactInfoSection.vue'
 import AccountDetailsSection from '@/components/views/customer-form/AccountDetailsSection.vue'
 import CustomerReviewDialog from '@/components/views/customer-form/CustomerReviewDialog.vue'
+import api from '@/api/index'
 
 type FormState = {
   firstName: string
@@ -40,6 +41,7 @@ const router = useRouter()
 const isSubmitting = ref(false)
 const showDiscardDialog = ref(false)
 const showConfirmDialog = ref(false)
+const uploadedImageFileId = ref<string | null>(null) // Track uncommitted ImageKit uploads
 
 // Load saved form data from localStorage on mount
 const loadSavedFormData = (): Partial<FormState> | null => {
@@ -130,6 +132,14 @@ onMounted(() => {
 onUnmounted(() => {
   // This will be handled by handleSubmit when successful
   // or kept in localStorage if user navigates away without submitting
+})
+
+// Cleanup unused uploads when user navigates away without submitting
+onBeforeUnmount(async () => {
+  // Only cleanup if there's an uncommitted upload
+  if (uploadedImageFileId.value) {
+    await cleanupUnusedUpload()
+  }
 })
 
 const errors = reactive<Record<keyof FormState, string>>({
@@ -299,6 +309,9 @@ const confirmSubmit = async () => {
     // Clear localStorage after successful submission
     clearSavedFormData()
 
+    // Clear the fileId since the image is now committed to a customer
+    uploadedImageFileId.value = null
+
     isSubmitting.value = false
     resetForm()
     router.push({ name: 'customers' })
@@ -335,6 +348,21 @@ const cancelSubmit = () => {
   showConfirmDialog.value = false
 }
 
+// Cleanup function to delete unused ImageKit uploads
+const cleanupUnusedUpload = async () => {
+  if (uploadedImageFileId.value) {
+    try {
+      await api.delete(`/imagekit/delete/${uploadedImageFileId.value}`)
+      console.log('Cleaned up unused ImageKit upload:', uploadedImageFileId.value)
+    } catch (error) {
+      // Silently fail - file might already be deleted or doesn't exist
+      console.warn('Failed to clean up ImageKit upload:', error)
+    } finally {
+      uploadedImageFileId.value = null
+    }
+  }
+}
+
 const handleCancel = () => {
   // Ask user if they want to discard changes
   const hasData = form.firstName || form.lastName || form.phoneNumber || form.email
@@ -346,7 +374,10 @@ const handleCancel = () => {
   }
 }
 
-const confirmDiscard = () => {
+const confirmDiscard = async () => {
+  // Clean up any uploaded images that weren't submitted
+  await cleanupUnusedUpload()
+  
   clearSavedFormData()
   showDiscardDialog.value = false
   router.back()
@@ -375,6 +406,7 @@ const cancelDiscard = () => {
           :error="errors.profilePicture"
           v-model="form.profilePicture"
           @update:error="(val) => errors.profilePicture = val"
+          @update:fileId="(id) => uploadedImageFileId = id"
         />
 
         <!-- Personal Information -->
