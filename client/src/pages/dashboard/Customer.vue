@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import { Search, Star, Plus, ChevronLeft, ChevronRight, Users, TrendingUp, Car } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,24 +22,29 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useCustomersStore } from '@/stores/customers'
+import { getCustomers } from '@/api/customers'
+import { toast } from 'vue-sonner'
 
 type Customer = {
   id: string
-  name: string
+  firstName: string
+  lastName: string
+  middleName?: string | null
+  suffix?: string | null
   phoneNumber: string
-  emailAddress: string
-  loyaltyStatus: 'Loyal' | 'Regular'
+  email: string
+  profilePicture?: string | null
+  loyaltyStatus: 'Loyal' | 'Regular' | 'VIP'
   totalVehicles: number
 }
 
 const router = useRouter()
-const customersStore = useCustomersStore()
-const { customers } = storeToRefs(customersStore)
+const customers = ref<Customer[]>([])
 
 const searchQuery = ref('')
 const debouncedSearchQuery = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+const loyaltyFilter = ref<'all' | 'Loyal' | 'Regular' | 'VIP'>('all')
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const isLoading = ref(true)
@@ -60,31 +64,64 @@ watch(sortOrder, () => {
   currentPage.value = 1
 })
 
+// Reset pagination when loyalty filter changes
+watch(loyaltyFilter, () => {
+  currentPage.value = 1
+})
+
 // Reset pagination when items per page changes
 watch(itemsPerPage, () => {
   currentPage.value = 1
 })
 
-// Simulate loading on mount
-onMounted(() => {
-  setTimeout(() => {
+// Fetch customers from API
+const fetchCustomers = async () => {
+  isLoading.value = true
+  try {
+    const response = await getCustomers()
+    customers.value = response.customers || []
+  } catch (error: any) {
+    console.error('Failed to fetch customers:', error)
+    toast.error('Failed to Load Customers', {
+      description: error.response?.data?.message || 'Failed to load customers. Please try again.'
+    })
+    customers.value = []
+  } finally {
     isLoading.value = false
-  }, 500)
+  }
+}
+
+// Fetch customers on mount
+onMounted(() => {
+  fetchCustomers()
 })
 
 const filteredCustomers = computed(() => {
   const query = debouncedSearchQuery.value.trim().toLowerCase()
 
   const filtered = customers.value.filter((customer) => {
+    // Apply loyalty filter
+    if (loyaltyFilter.value !== 'all' && customer.loyaltyStatus !== loyaltyFilter.value) {
+      return false
+    }
+
+    // Apply search filter
     if (!query) return true
+    
+    const fullName = `${customer.firstName} ${customer.middleName || ''} ${customer.lastName} ${customer.suffix || ''}`.trim()
     const haystack = [
       customer.id,
-      customer.name,
+      fullName,
+      customer.firstName,
+      customer.lastName,
+      customer.middleName,
+      customer.suffix,
       customer.phoneNumber,
-      customer.emailAddress,
+      customer.email,
       customer.loyaltyStatus,
       String(customer.totalVehicles)
     ]
+      .filter(Boolean)
       .join(' ')
       .toLowerCase()
 
@@ -92,7 +129,9 @@ const filteredCustomers = computed(() => {
   })
 
   return [...filtered].sort((a, b) => {
-    const comparison = a.name.localeCompare(b.name)
+    const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
+    const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
+    const comparison = nameA.localeCompare(nameB)
     return sortOrder.value === 'asc' ? comparison : -comparison
   })
 })
@@ -174,6 +213,16 @@ const viewProfile = (id: string) => {
   router.push({ path: `/dashboard/customers/${id}` })
 }
 
+// Helper function to format customer full name
+const getCustomerFullName = (customer: Customer) => {
+  return `${customer.firstName} ${customer.middleName ? customer.middleName + ' ' : ''}${customer.lastName}${customer.suffix ? ' ' + customer.suffix : ''}`.trim()
+}
+
+// Refresh customers list
+const refreshCustomers = () => {
+  fetchCustomers()
+}
+
 </script>
 
 <template>
@@ -237,6 +286,17 @@ const viewProfile = (id: string) => {
             Add Customer
           </RouterLink>
         </Button>
+        <Select v-model="loyaltyFilter">
+          <SelectTrigger class="sm:w-[160px]">
+            <SelectValue placeholder="Loyalty Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="Loyal">Loyal</SelectItem>
+            <SelectItem value="Regular">Regular</SelectItem>
+            <SelectItem value="VIP">VIP</SelectItem>
+          </SelectContent>
+        </Select>
         <Select v-model="sortOrder">
           <SelectTrigger class="sm:w-[180px]">
             <SelectValue placeholder="Sort by" />
@@ -295,23 +355,23 @@ const viewProfile = (id: string) => {
             class="hover:bg-muted/50"
           >
             <TableCell class="p-4 font-medium">{{ customer.id }}</TableCell>
-            <TableCell class="p-4 font-medium">{{ customer.name }}</TableCell>
+            <TableCell class="p-4 font-medium">{{ getCustomerFullName(customer) }}</TableCell>
             <TableCell class="p-4">{{ customer.phoneNumber }}</TableCell>
-            <TableCell class="p-4">{{ customer.emailAddress }}</TableCell>
+            <TableCell class="p-4">{{ customer.email }}</TableCell>
             <TableCell class="p-4">
               <Badge
                 v-if="customer.loyaltyStatus === 'Loyal'"
                 class="bg-gradient-to-r from-amber-500 to-yellow-500 text-white hover:from-amber-600 hover:to-yellow-600"
               >
                 <Star class="mr-1 h-3 w-3 fill-current" />
-                {{ customer.loyaltyStatus }}
+                Loyal
               </Badge>
               <Badge
                 v-else
                 variant="outline"
                 class="capitalize"
               >
-                {{ customer.loyaltyStatus.toLowerCase() }}
+                {{ customer.loyaltyStatus }}
               </Badge>
             </TableCell>
             <TableCell class="p-4 text-right">{{ customer.totalVehicles }}</TableCell>

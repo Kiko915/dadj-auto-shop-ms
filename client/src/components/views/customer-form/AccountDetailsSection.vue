@@ -61,9 +61,9 @@ const emit = defineEmits<{
                 <SelectValue placeholder="Select loyalty status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Regular">Regular</SelectItem>
-                <SelectItem value="Loyal">Loyal</SelectItem>
-                <SelectItem value="VIP">VIP</SelectItem>
+                <SelectItem value="regular">Regular</SelectItem>
+                <SelectItem value="loyal">Loyal</SelectItem>
+                <SelectItem value="vip">VIP</SelectItem>
               </SelectContent>
             </Select>
             <CheckCircle
