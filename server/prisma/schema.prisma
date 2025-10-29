@@ -82,11 +82,15 @@ model Customer {
   id            String   @id @default(cuid()) @map("customer_id")
   firstName     String   @map("first_name")
   lastName      String   @map("last_name")
+  middleName    String?  @map("middle_name")
+  suffix        String?
   phoneNumber   String   @map("phone_number")
   email         String?  @unique
+  profilePicture String? @map("customer_profile_picture") // ImageKit URL
   notes         String?  @db.Text
   isActive      Boolean  @default(true) @map("is_active")
-  loyaltyStatus String   @default("regular") @map("loyalty_status") // regular, silver, gold, platinum
+  loyaltyStatus String   @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP
+  totalVehicles Int      @default(0) @map("total_vehicles")
   serviceCount  Int      @default(0) @map("service_count")
   totalSpent    Decimal  @default(0) @db.Decimal(10, 2) @map("total_spent")
   

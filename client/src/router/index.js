@@ -45,11 +45,6 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/Dashboard.vue'),
         },
         {
-          path: 'analytics',
-          name: 'analytics',
-          component: () => import('@/pages/dashboard/Analytics.vue'),
-        },
-        {
           path: 'profile',
           name: 'profile',
           component: () => import('@/pages/dashboard/Profile.vue'),

@@ -8,7 +8,8 @@ const seedCustomers = [
     phoneNumber: '+63 917 555 2101',
     emailAddress: 'isabella.cortez@example.com',
     loyaltyStatus: 'Loyal',
-    totalVehicles: 4
+    totalVehicles: 4,
+    profilePicture: null
   },
   
 ]
