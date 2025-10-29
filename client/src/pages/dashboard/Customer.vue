@@ -1,30 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import { Search, Star, Plus, ChevronLeft, ChevronRight, Users, TrendingUp, Car } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import { getCustomers } from '@/api/customers'
 import { toast } from 'vue-sonner'
+import { getCustomers, deleteCustomer } from '@/api/customers'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
+// Import modular components
+import CustomerStatsCards from '@/components/views/customers/CustomerStatsCards.vue'
+import CustomerFilters from '@/components/views/customers/CustomerFilters.vue'
+import CustomerBulkActions from '@/components/views/customers/CustomerBulkActions.vue'
+import CustomerTableHeader from '@/components/views/customers/CustomerTableHeader.vue'
+import CustomerTableRow from '@/components/views/customers/CustomerTableRow.vue'
+import DeleteCustomersDialog from '@/components/views/customers/DeleteCustomersDialog.vue'
+import CustomerPagination from '@/components/views/customers/CustomerPagination.vue'
+
+// Type definitions
 type Customer = {
   id: string
   firstName: string
@@ -38,9 +28,9 @@ type Customer = {
   totalVehicles: number
 }
 
-const router = useRouter()
+// State
 const customers = ref<Customer[]>([])
-
+const selectedCustomerIds = ref<string[]>([])
 const searchQuery = ref('')
 const debouncedSearchQuery = ref('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
@@ -48,6 +38,8 @@ const loyaltyFilter = ref<'all' | 'Loyal' | 'Regular' | 'VIP'>('all')
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const isLoading = ref(true)
+const showDeleteDialog = ref(false)
+const isDeleting = ref(false)
 
 // Debounce search input
 let debounceTimeout: ReturnType<typeof setTimeout>
@@ -55,23 +47,18 @@ watch(searchQuery, (newValue) => {
   clearTimeout(debounceTimeout)
   debounceTimeout = setTimeout(() => {
     debouncedSearchQuery.value = newValue
-    currentPage.value = 1 // Reset to first page on search
+    currentPage.value = 1
   }, 300)
 })
 
-// Reset pagination when sort order changes
-watch(sortOrder, () => {
+// Reset pagination when filters change
+watch([sortOrder, loyaltyFilter, itemsPerPage], () => {
   currentPage.value = 1
 })
 
-// Reset pagination when loyalty filter changes
-watch(loyaltyFilter, () => {
-  currentPage.value = 1
-})
-
-// Reset pagination when items per page changes
-watch(itemsPerPage, () => {
-  currentPage.value = 1
+// Clear selection when changing pages or filters
+watch([currentPage, loyaltyFilter, debouncedSearchQuery], () => {
+  selectedCustomerIds.value = []
 })
 
 // Fetch customers from API
@@ -96,16 +83,20 @@ onMounted(() => {
   fetchCustomers()
 })
 
+// Computed: Filter and sort customers
 const filteredCustomers = computed(() => {
   const query = debouncedSearchQuery.value.trim().toLowerCase()
 
   const filtered = customers.value.filter((customer) => {
-    // Apply loyalty filter
-    if (loyaltyFilter.value !== 'all' && customer.loyaltyStatus !== loyaltyFilter.value) {
-      return false
+    // Loyalty filter with case-insensitive comparison
+    if (loyaltyFilter.value !== 'all') {
+      const filterValue = loyaltyFilter.value.toLowerCase()
+      const customerStatus = (customer.loyaltyStatus || '').toLowerCase()
+      if (customerStatus !== filterValue) {
+        return false
+      }
     }
 
-    // Apply search filter
     if (!query) return true
     
     const fullName = `${customer.firstName} ${customer.middleName || ''} ${customer.lastName} ${customer.suffix || ''}`.trim()
@@ -136,7 +127,7 @@ const filteredCustomers = computed(() => {
   })
 })
 
-// Quick stats computed properties
+// Computed: Stats
 const totalCustomers = computed(() => customers.value.length)
 const loyalCustomers = computed(() => 
   customers.value.filter(c => c.loyaltyStatus === 'Loyal').length
@@ -145,6 +136,7 @@ const totalVehicles = computed(() =>
   customers.value.reduce((sum, c) => sum + c.totalVehicles, 0)
 )
 
+// Computed: Pagination
 const totalPages = computed(() => Math.ceil(filteredCustomers.value.length / itemsPerPage.value))
 
 const paginatedCustomers = computed(() => {
@@ -153,50 +145,124 @@ const paginatedCustomers = computed(() => {
   return filteredCustomers.value.slice(start, end)
 })
 
-// Smart pagination with ellipsis
-const paginationRange = computed(() => {
-  const pages: (number | string)[] = []
-  const total = totalPages.value
-  const current = currentPage.value
-
-  if (total <= 7) {
-    // Show all pages if 7 or fewer
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    // Always show first page
-    pages.push(1)
-
-    if (current > 3) {
-      pages.push('...')
-    }
-
-    // Show pages around current page
-    const start = Math.max(2, current - 1)
-    const end = Math.min(total - 1, current + 1)
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i)
-    }
-
-    if (current < total - 2) {
-      pages.push('...')
-    }
-
-    // Always show last page
-    pages.push(total)
-  }
-
-  return pages
+const startItem = computed(() => {
+  if (filteredCustomers.value.length === 0) return 0
+  return (currentPage.value - 1) * itemsPerPage.value + 1
 })
 
-const goToPage = (page: number | string) => {
-  if (typeof page === 'number' && page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
+const endItem = computed(() => {
+  const end = currentPage.value * itemsPerPage.value
+  return Math.min(end, filteredCustomers.value.length)
+})
+
+// Computed: Selection
+const isAllSelected = computed(() => {
+  if (paginatedCustomers.value.length === 0) return false
+  return paginatedCustomers.value.every(customer => 
+    selectedCustomerIds.value.includes(customer.id)
+  )
+})
+
+const isIndeterminate = computed(() => {
+  if (paginatedCustomers.value.length === 0) return false
+  const selectedOnPage = paginatedCustomers.value.filter(customer => 
+    selectedCustomerIds.value.includes(customer.id)
+  ).length
+  return selectedOnPage > 0 && selectedOnPage < paginatedCustomers.value.length
+})
+
+const selectAllModel = computed({
+  get: () => isAllSelected.value,
+  set: (value: boolean | 'indeterminate') => {
+    if (value === true) {
+      const newIds = paginatedCustomers.value
+        .filter(customer => !selectedCustomerIds.value.includes(customer.id))
+        .map(customer => customer.id)
+      selectedCustomerIds.value = [...selectedCustomerIds.value, ...newIds]
+    } else {
+      const pageIds = paginatedCustomers.value.map(c => c.id)
+      selectedCustomerIds.value = selectedCustomerIds.value.filter(id => !pageIds.includes(id))
+    }
+  }
+})
+
+const selectedCount = computed(() => selectedCustomerIds.value.length)
+
+// Methods: Selection
+const clearSelection = () => {
+  selectedCustomerIds.value = []
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    const pageIds = paginatedCustomers.value.map(c => c.id)
+    selectedCustomerIds.value = selectedCustomerIds.value.filter(id => !pageIds.includes(id))
+  } else {
+    const newIds = paginatedCustomers.value
+      .filter(customer => !selectedCustomerIds.value.includes(customer.id))
+      .map(customer => customer.id)
+    selectedCustomerIds.value = [...selectedCustomerIds.value, ...newIds]
   }
 }
 
+const toggleCustomerSelection = (customerId: string) => {
+  if (selectedCustomerIds.value.includes(customerId)) {
+    selectedCustomerIds.value = selectedCustomerIds.value.filter(id => id !== customerId)
+  } else {
+    selectedCustomerIds.value = [...selectedCustomerIds.value, customerId]
+  }
+}
+
+const isCustomerSelected = (customerId: string) => {
+  return selectedCustomerIds.value.includes(customerId)
+}
+
+// Methods: Delete
+const openDeleteDialog = () => {
+  showDeleteDialog.value = true
+}
+
+const handleDeleteConfirm = async () => {
+  if (selectedCustomerIds.value.length === 0) {
+    toast.error('No customers selected')
+    return
+  }
+
+  isDeleting.value = true
+  let successCount = 0
+  let errorCount = 0
+
+  try {
+    for (const customerId of selectedCustomerIds.value) {
+      try {
+        await deleteCustomer(customerId)
+        successCount++
+      } catch (error) {
+        console.error(`Failed to delete customer ${customerId}:`, error)
+        errorCount++
+      }
+    }
+
+    if (successCount > 0 && errorCount === 0) {
+      toast.success(`Successfully deleted ${successCount} customer${successCount > 1 ? 's' : ''}`)
+    } else if (successCount > 0 && errorCount > 0) {
+      toast.warning(`Deleted ${successCount} customer${successCount > 1 ? 's' : ''}, but ${errorCount} failed`)
+    } else {
+      toast.error('Failed to delete customers')
+    }
+
+    await fetchCustomers()
+    clearSelection()
+    showDeleteDialog.value = false
+  } catch (error) {
+    console.error('Error during bulk delete:', error)
+    toast.error('An error occurred while deleting customers')
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+// Methods: Pagination
 const previousPage = () => {
   if (currentPage.value > 1) {
     currentPage.value--
@@ -208,25 +274,11 @@ const nextPage = () => {
     currentPage.value++
   }
 }
-
-const viewProfile = (id: string) => {
-  router.push({ path: `/dashboard/customers/${id}` })
-}
-
-// Helper function to format customer full name
-const getCustomerFullName = (customer: Customer) => {
-  return `${customer.firstName} ${customer.middleName ? customer.middleName + ' ' : ''}${customer.lastName}${customer.suffix ? ' ' + customer.suffix : ''}`.trim()
-}
-
-// Refresh customers list
-const refreshCustomers = () => {
-  fetchCustomers()
-}
-
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Header -->
     <header class="space-y-2">
       <h1 class="text-3xl font-bold tracking-tight">Customer Directory</h1>
       <p class="text-muted-foreground">
@@ -234,234 +286,87 @@ const refreshCustomers = () => {
       </p>
     </header>
 
-    <!-- Quick Stats Cards -->
-    <div class="grid gap-4 md:grid-cols-3">
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Total Customers</CardTitle>
-          <Users class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ totalCustomers }}</div>
-          <p class="text-xs text-muted-foreground">All registered customers</p>
-        </CardContent>
-      </Card>
+    <!-- Stats Cards -->
+    <CustomerStatsCards
+      v-if="!isLoading"
+      :total-customers="totalCustomers"
+      :loyal-customers="loyalCustomers"
+      :total-vehicles="totalVehicles"
+    />
 
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Loyal Customers</CardTitle>
-          <Star class="h-4 w-4 text-amber-500" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold text-amber-500">{{ loyalCustomers }}</div>
-          <p class="text-xs text-muted-foreground">Premium tier members</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Total Vehicles</CardTitle>
-          <Car class="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div class="text-2xl font-bold">{{ totalVehicles }}</div>
-          <p class="text-xs text-muted-foreground">Across all customers</p>
-        </CardContent>
+    <!-- Stats Skeleton Loading -->
+    <div v-else class="grid gap-4 md:grid-cols-3">
+      <Card v-for="i in 3" :key="i">
+        <div class="p-6 space-y-2">
+          <Skeleton class="h-4 w-24" />
+          <Skeleton class="h-8 w-16" />
+        </div>
       </Card>
     </div>
 
-    <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div class="relative w-full md:max-w-2xl">
-        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          placeholder="Search name, phone, email, loyalty, vehicles"
-          class="pl-10"
+    <!-- Filters and Actions -->
+    <CustomerFilters
+      v-model:search-query="searchQuery"
+      v-model:loyalty-filter="loyaltyFilter"
+      v-model:sort-order="sortOrder"
+      v-model:items-per-page="itemsPerPage"
+    />
+
+    <!-- Bulk Actions Toolbar -->
+    <CustomerBulkActions
+      :selected-count="selectedCount"
+      @clear-selection="clearSelection"
+      @delete-selected="openDeleteDialog"
+    />
+
+    <!-- Customer Table -->
+    <Card>
+      <div v-if="isLoading" class="p-8">
+        <div class="space-y-4">
+          <Skeleton v-for="i in 5" :key="i" class="h-12 w-full" />
+        </div>
+      </div>
+
+      <div v-else-if="filteredCustomers.length === 0" class="p-8 text-center">
+        <p class="text-muted-foreground">No customers found.</p>
+      </div>
+
+      <div v-else class="overflow-x-auto">
+        <CustomerTableHeader 
+          :is-all-selected="isAllSelected"
+          :is-indeterminate="isIndeterminate"
+          @toggle-select-all="toggleSelectAll"
+        />
+        
+        <CustomerTableRow
+          v-for="customer in paginatedCustomers"
+          :key="customer.id"
+          :customer="customer"
+          :is-selected="isCustomerSelected(customer.id)"
+          @toggle-selection="toggleCustomerSelection"
         />
       </div>
-      <div class="flex flex-col items-stretch gap-2 sm:flex-row md:w-auto">
-        <Button asChild variant="primary" class="sm:w-[180px]">
-          <RouterLink :to="{ name: 'add-customer' }">
-            <Plus class="mr-2 h-4 w-4" />
-            Add Customer
-          </RouterLink>
-        </Button>
-        <Select v-model="loyaltyFilter">
-          <SelectTrigger class="sm:w-[160px]">
-            <SelectValue placeholder="Loyalty Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="Loyal">Loyal</SelectItem>
-            <SelectItem value="Regular">Regular</SelectItem>
-            <SelectItem value="VIP">VIP</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select v-model="sortOrder">
-          <SelectTrigger class="sm:w-[180px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="asc">Name (A → Z)</SelectItem>
-            <SelectItem value="desc">Name (Z → A)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select v-model="itemsPerPage">
-          <SelectTrigger class="sm:w-[120px]">
-            <SelectValue placeholder="Per page" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem :value="10">10 / page</SelectItem>
-            <SelectItem :value="25">25 / page</SelectItem>
-            <SelectItem :value="50">50 / page</SelectItem>
-            <SelectItem :value="100">100 / page</SelectItem>
-          </SelectContent>
-        </Select>
+
+      <!-- Pagination -->
+      <div v-if="!isLoading && filteredCustomers.length > 0" class="border-t p-4">
+        <CustomerPagination
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :start-item="startItem"
+          :end-item="endItem"
+          :total-items="filteredCustomers.length"
+          @previous="previousPage"
+          @next="nextPage"
+        />
       </div>
-    </section>
+    </Card>
 
-    <section class="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-      <Table class="text-base">
-        <TableHeader>
-          <TableRow>
-            <TableHead class="h-12 px-4 text-base">Customer ID</TableHead>
-            <TableHead class="h-12 px-4 text-base">Name</TableHead>
-            <TableHead class="h-12 px-4 text-base">Phone Number</TableHead>
-            <TableHead class="h-12 px-4 text-base">Email Address</TableHead>
-            <TableHead class="h-12 px-4 text-base">Loyalty Status</TableHead>
-            <TableHead class="h-12 px-4 text-right text-base">Total Vehicles</TableHead>
-            <TableHead class="h-12 px-4 text-right text-base">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        
-        <!-- Loading State -->
-        <TableBody v-if="isLoading">
-          <TableRow v-for="i in itemsPerPage" :key="`skeleton-${i}`">
-            <TableCell class="p-4"><Skeleton class="h-5 w-20" /></TableCell>
-            <TableCell class="p-4"><Skeleton class="h-5 w-32" /></TableCell>
-            <TableCell class="p-4"><Skeleton class="h-5 w-28" /></TableCell>
-            <TableCell class="p-4"><Skeleton class="h-5 w-40" /></TableCell>
-            <TableCell class="p-4"><Skeleton class="h-6 w-16" /></TableCell>
-            <TableCell class="p-4 text-right"><Skeleton class="ml-auto h-5 w-8" /></TableCell>
-            <TableCell class="p-4 text-right"><Skeleton class="ml-auto h-8 w-24" /></TableCell>
-          </TableRow>
-        </TableBody>
-
-        <!-- Data Rows -->
-        <TableBody v-else-if="paginatedCustomers.length">
-          <TableRow
-            v-for="customer in paginatedCustomers"
-            :key="customer.id"
-            class="hover:bg-muted/50"
-          >
-            <TableCell class="p-4 font-medium">{{ customer.id }}</TableCell>
-            <TableCell class="p-4 font-medium">{{ getCustomerFullName(customer) }}</TableCell>
-            <TableCell class="p-4">{{ customer.phoneNumber }}</TableCell>
-            <TableCell class="p-4">{{ customer.email }}</TableCell>
-            <TableCell class="p-4">
-              <Badge
-                v-if="customer.loyaltyStatus === 'Loyal'"
-                class="bg-gradient-to-r from-amber-500 to-yellow-500 text-white hover:from-amber-600 hover:to-yellow-600"
-              >
-                <Star class="mr-1 h-3 w-3 fill-current" />
-                Loyal
-              </Badge>
-              <Badge
-                v-else
-                variant="outline"
-                class="capitalize"
-              >
-                {{ customer.loyaltyStatus }}
-              </Badge>
-            </TableCell>
-            <TableCell class="p-4 text-right">{{ customer.totalVehicles }}</TableCell>
-            <TableCell class="p-4 text-right">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="viewProfile(customer.id)"
-              >
-                View Profile
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-
-        <!-- Empty State -->
-        <TableBody v-else>
-          <TableRow>
-            <TableCell colspan="7" class="p-12">
-              <div class="flex flex-col items-center justify-center text-center">
-                <Users class="mb-4 h-16 w-16 text-muted-foreground/40" />
-                <h3 class="mb-2 text-lg font-semibold">No customers found</h3>
-                <p class="mb-4 text-sm text-muted-foreground">
-                  {{ searchQuery ? 'Try adjusting your search filters' : 'Get started by adding your first customer' }}
-                </p>
-                <Button
-                  v-if="!searchQuery"
-                  asChild
-                  variant="primary"
-                  size="sm"
-                >
-                  <RouterLink :to="{ name: 'add-customer' }">
-                    <Plus class="mr-2 h-4 w-4" />
-                    Add Customer
-                  </RouterLink>
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </section>
-
-    <!-- Pagination Controls -->
-    <section v-if="!isLoading && filteredCustomers.length > 0" class="flex items-center justify-between px-2">
-      <div class="text-sm text-muted-foreground">
-        Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
-        {{ Math.min(currentPage * itemsPerPage, filteredCustomers.length) }} of 
-        {{ filteredCustomers.length }} customers
-      </div>
-      <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="currentPage === 1"
-          @click="previousPage"
-        >
-          <ChevronLeft class="h-4 w-4" />
-          Previous
-        </Button>
-        
-        <div class="flex items-center gap-1">
-          <Button
-            v-for="(page, index) in paginationRange"
-            :key="`page-${index}`"
-            variant="outline"
-            size="sm"
-            :class="[
-              'min-w-[40px]',
-              currentPage === page ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground' : '',
-              page === '...' ? 'pointer-events-none' : ''
-            ]"
-            :disabled="page === '...'"
-            @click="goToPage(page)"
-          >
-            {{ page }}
-          </Button>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="currentPage === totalPages"
-          @click="nextPage"
-        >
-          Next
-          <ChevronRight class="h-4 w-4" />
-        </Button>
-      </div>
-    </section>
+    <!-- Delete Confirmation Dialog -->
+    <DeleteCustomersDialog
+      v-model:open="showDeleteDialog"
+      :selected-count="selectedCount"
+      :is-deleting="isDeleting"
+      @confirm="handleDeleteConfirm"
+    />
   </div>
 </template>

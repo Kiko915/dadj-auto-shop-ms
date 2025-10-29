@@ -89,7 +89,7 @@ model Customer {
   profilePicture String? @map("customer_profile_picture") // ImageKit URL
   notes         String?  @db.Text
   isActive      Boolean  @default(true) @map("is_active")
-  loyaltyStatus String   @default("regular") @map("loyalty_status") // regular, silver, gold, platinum
+  loyaltyStatus String   @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP
   totalVehicles Int      @default(0) @map("total_vehicles")
   serviceCount  Int      @default(0) @map("service_count")
   totalSpent    Decimal  @default(0) @db.Decimal(10, 2) @map("total_spent")

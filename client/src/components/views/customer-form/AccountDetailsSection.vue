@@ -91,7 +91,7 @@ const emit = defineEmits<{
               id="total-vehicles"
               :model-value="totalVehicles"
               type="number"
-              min="0"
+              min="1"
               placeholder="0"
               :class="{
                 'border-destructive': touched.totalVehicles && errors.totalVehicles,
