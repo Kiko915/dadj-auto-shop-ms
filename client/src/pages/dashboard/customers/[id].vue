@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   User,
   Phone,
@@ -24,6 +25,7 @@ import {
   ArrowLeft,
   DollarSign,
   Package,
+  Info,
 } from 'lucide-vue-next'
 
 // Types
@@ -75,6 +77,8 @@ const customer = ref<Customer | null>(null)
 const vehicles = ref<Vehicle[]>([])
 const serviceHistory = ref<ServiceRecord[]>([])
 const isLoading = ref(true)
+const isNewCustomer = computed(() => route.query.new === 'true')
+const showVehicleNotice = ref(false)
 
 // Get active tab from URL query or default to 'general'
 const activeTab = computed({
@@ -161,6 +165,15 @@ const fetchCustomerData = async () => {
     } catch (error) {
       console.warn('Failed to fetch service history:', error)
       serviceHistory.value = []
+    }
+
+    // Check if this is a new customer with no vehicles
+    if (isNewCustomer.value && vehicles.value.length === 0) {
+      showVehicleNotice.value = true
+      // Remove the 'new' query param after checking to prevent showing notice on refresh
+      router.replace({
+        query: { ...route.query, new: undefined }
+      })
     }
   } catch (error: any) {
     console.error('Error fetching customer:', error)
@@ -431,6 +444,20 @@ onMounted(() => {
 
         <!-- Vehicles Tab -->
         <TabsContent value="vehicles" class="space-y-4">
+          <!-- New Customer Notice -->
+          <Alert v-if="showVehicleNotice" class="border-blue-500 bg-blue-50 dark:bg-blue-950">
+            <Info class="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <AlertTitle class="text-blue-900 dark:text-blue-100">Welcome! Customer Successfully Created</AlertTitle>
+            <AlertDescription class="text-blue-800 dark:text-blue-200">
+              <p class="mb-2">
+                {{ fullName }} has been added to your customer database. 
+              </p>
+              <p>
+                To get started, add their first vehicle by clicking the button below. This will help you track service history and maintenance schedules for their vehicles.
+              </p>
+            </AlertDescription>
+          </Alert>
+
           <Card>
             <CardHeader>
               <div class="flex items-center justify-between">
