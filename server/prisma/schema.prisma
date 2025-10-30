@@ -86,6 +86,7 @@ model Customer {
   suffix        String?
   phoneNumber   String   @map("phone_number")
   email         String?  @unique
+  birthday      DateTime? @map("birthday") @db.Date
   profilePicture String? @map("customer_profile_picture") // ImageKit URL
   notes         String?  @db.Text
   isActive      Boolean  @default(true) @map("is_active")

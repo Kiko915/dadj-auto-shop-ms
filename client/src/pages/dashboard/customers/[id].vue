@@ -35,6 +35,7 @@ type Customer = {
   suffix?: string | null
   phoneNumber: string
   email: string
+  birthday?: string | null
   profilePicture?: string | null
   loyaltyStatus: 'Loyal' | 'Regular' | 'VIP'
   totalVehicles: number
@@ -126,6 +127,15 @@ const formattedTotalSpent = computed(() => {
     style: 'currency',
     currency: 'PHP',
   }).format(customer.value.totalSpent)
+})
+
+const formattedBirthday = computed(() => {
+  if (!customer.value?.birthday) return null
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(customer.value.birthday))
 })
 
 // Methods
@@ -334,6 +344,10 @@ onMounted(() => {
                 <div v-if="customer.suffix" class="space-y-1">
                   <p class="text-sm font-medium text-muted-foreground">Suffix</p>
                   <p class="text-base">{{ customer.suffix }}</p>
+                </div>
+                <div v-if="formattedBirthday" class="space-y-1">
+                  <p class="text-sm font-medium text-muted-foreground">Birthday</p>
+                  <p class="text-base">{{ formattedBirthday }}</p>
                 </div>
               </div>
 
