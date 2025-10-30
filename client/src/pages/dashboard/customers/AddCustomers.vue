@@ -321,7 +321,14 @@ const confirmSubmit = async () => {
 
     isSubmitting.value = false
     resetForm()
-    router.push({ name: 'customers' })
+    
+    // Redirect to the newly created customer's detail page
+    // Add 'new=true' query param to trigger vehicles tab and show notice
+    router.push({ 
+      name: 'customer-detail', 
+      params: { id: response.customer.id },
+      query: { new: 'true', tab: 'vehicles' }
+    })
   } catch (error) {
     isSubmitting.value = false
     
