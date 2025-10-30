@@ -56,7 +56,7 @@ const handleItemsPerPageUpdate = (value: string | number) => {
       />
     </div>
     <div class="flex flex-col items-stretch gap-2 sm:flex-row md:w-auto">
-      <Button asChild variant="primary" class="sm:w-[180px]">
+      <Button asChild class="sm:w-[180px]">
         <RouterLink :to="{ name: 'add-customer' }">
           <Plus class="mr-2 h-4 w-4" />
           Add Customer

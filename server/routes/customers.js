@@ -35,7 +35,8 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             middleName, 
             suffix, 
             phoneNumber, 
-            email, 
+            email,
+            birthday,
             profilePicture,
             notes, 
             loyaltyStatus,
@@ -69,6 +70,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 suffix: suffix || null,
                 phoneNumber,
                 email,
+                birthday: birthday ? new Date(birthday) : null,
                 profilePicture: profilePicture || null,
                 notes: notes || null,
                 loyaltyStatus: loyaltyStatus || 'regular',
@@ -179,6 +181,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             loyaltyStatus,
             serviceCount,
             totalSpent,
+            birthday,
         } = req.body;
 
         // Check if the customer exists
@@ -203,6 +206,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 ...(loyaltyStatus && { loyaltyStatus }),
                 ...(typeof serviceCount === 'number' && { serviceCount }),
                 ...(typeof totalSpent === 'number' && { totalSpent }),
+                ...(birthday !== undefined && { birthday: birthday ? new Date(birthday) : null }),
             },
         });
 

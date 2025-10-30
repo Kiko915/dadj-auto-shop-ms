@@ -20,6 +20,7 @@ interface CustomerData {
   suffix: string
   phoneNumber: string
   email: string
+  birthday: Date | null
   loyaltyStatus: string
   totalVehicles: string
   profilePicture: string | null
@@ -57,6 +58,16 @@ const initials = computed(() => {
     return `${props.customerData.firstName[0]}${props.customerData.lastName[0]}`.toUpperCase()
   }
   return '?'
+})
+
+// Computed property for formatted birthday
+const formattedBirthday = computed(() => {
+  if (!props.customerData.birthday) return null
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(props.customerData.birthday))
 })
 
 const handleConfirm = () => {
@@ -115,6 +126,10 @@ const handleCancel = () => {
             <div v-if="customerData.suffix" class="space-y-1">
               <p class="text-sm text-muted-foreground">Suffix</p>
               <p class="font-medium">{{ customerData.suffix }}</p>
+            </div>
+            <div v-if="formattedBirthday" class="space-y-1">
+              <p class="text-sm text-muted-foreground">Birthday</p>
+              <p class="font-medium">{{ formattedBirthday }}</p>
             </div>
           </div>
         </div>

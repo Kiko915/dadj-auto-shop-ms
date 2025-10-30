@@ -21,6 +21,7 @@ import ProfilePictureUpload from '@/components/views/customer-form/ProfilePictur
 import ContactInfoSection from '@/components/views/customer-form/ContactInfoSection.vue'
 import AccountDetailsSection from '@/components/views/customer-form/AccountDetailsSection.vue'
 import CustomerReviewDialog from '@/components/views/customer-form/CustomerReviewDialog.vue'
+import { DatePicker } from '@/components/ui/date-picker'
 import api from '@/api/index'
 
 type FormState = {
@@ -30,6 +31,7 @@ type FormState = {
   suffix: string
   phoneNumber: string
   email: string
+  birthday: Date | null
   loyaltyStatus: string
   totalVehicles: string
   profilePicture: string | null
@@ -63,6 +65,7 @@ const form = reactive<FormState>({
   suffix: '',
   phoneNumber: '',
   email: '',
+  birthday: null,
   loyaltyStatus: '',
   totalVehicles: '0',
   profilePicture: null
@@ -75,6 +78,7 @@ const resetForm = () => {
   form.suffix = ''
   form.phoneNumber = ''
   form.email = ''
+  form.birthday = null
   form.loyaltyStatus = ''
   form.totalVehicles = '0'
   form.profilePicture = null
@@ -149,6 +153,7 @@ const errors = reactive<Record<keyof FormState, string>>({
   suffix: '',
   phoneNumber: '',
   email: '',
+  birthday: '',
   loyaltyStatus: '',
   totalVehicles: '',
   profilePicture: ''
@@ -161,6 +166,7 @@ const touched = reactive<Record<keyof FormState, boolean>>({
   suffix: false,
   phoneNumber: false,
   email: false,
+  birthday: false,
   loyaltyStatus: false,
   totalVehicles: false,
   profilePicture: false
@@ -290,6 +296,7 @@ const confirmSubmit = async () => {
       suffix: form.suffix.trim() || undefined,
       phoneNumber: form.phoneNumber.trim(),
       email: form.email.trim(),
+      birthday: form.birthday ? form.birthday.toISOString() : undefined,
       loyaltyStatus: form.loyaltyStatus,
       totalVehicles: Number(form.totalVehicles),
       profilePicture: form.profilePicture || undefined
@@ -544,6 +551,18 @@ const cancelDiscard = () => {
                   {{ errors.suffix }}
                 </p>
               </div>
+
+              <!-- Birthday -->
+              <div class="space-y-2">
+                <Label for="birthday">
+                  Birthday
+                  <span class="text-muted-foreground text-xs">(Optional)</span>
+                </Label>
+                <DatePicker
+                  v-model="form.birthday"
+                  placeholder="Select birthday"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -598,7 +617,6 @@ const cancelDiscard = () => {
             </Button>
             <Button
               type="submit"
-              variant="primary"
               class="w-full sm:w-auto"
               :disabled="isSubmitting"
             >
