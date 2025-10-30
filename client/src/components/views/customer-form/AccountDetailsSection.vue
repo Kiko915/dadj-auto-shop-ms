@@ -92,7 +92,8 @@ const emit = defineEmits<{
               :model-value="totalVehicles"
               type="number"
               min="1"
-              placeholder="0"
+              placeholder="1"
+              value="1"
               :class="{
                 'border-destructive': touched.totalVehicles && errors.totalVehicles,
                 'border-green-500': touched.totalVehicles && !errors.totalVehicles && totalVehicles

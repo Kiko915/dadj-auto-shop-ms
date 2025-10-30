@@ -64,6 +64,11 @@ const router = createRouter({
           path: 'customers/add-customer',
           name: 'add-customer',
           component: () => import('@/pages/dashboard/customers/AddCustomers.vue'),
+        },
+        {
+          path: 'customers/:id',
+          name: 'customer-detail',
+          component: () => import('@/pages/dashboard/customers/[id].vue'),
         }
       ]
     },
