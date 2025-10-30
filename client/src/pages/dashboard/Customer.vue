@@ -130,7 +130,7 @@ const filteredCustomers = computed(() => {
 // Computed: Stats
 const totalCustomers = computed(() => customers.value.length)
 const loyalCustomers = computed(() => 
-  customers.value.filter(c => c.loyaltyStatus === 'Loyal').length
+  customers.value.filter(c => c.loyaltyStatus?.toLowerCase() === 'loyal').length
 )
 const totalVehicles = computed(() => 
   customers.value.reduce((sum, c) => sum + c.totalVehicles, 0)

@@ -72,14 +72,14 @@ const handleCheckboxChange = () => {
     <!-- Loyalty Status -->
     <div>
       <Badge 
-        v-if="customer.loyaltyStatus === 'Loyal'" 
+        v-if="customer.loyaltyStatus?.toLowerCase() === 'loyal'" 
         variant="secondary" 
         class="bg-amber-500/10 text-amber-700 hover:bg-amber-500/20"
       >
         Loyal
       </Badge>
       <Badge 
-        v-else-if="customer.loyaltyStatus === 'VIP'" 
+        v-else-if="customer.loyaltyStatus?.toLowerCase() === 'vip'" 
         variant="secondary"
         class="bg-purple-500/10 text-purple-700 hover:bg-purple-500/20"
       >

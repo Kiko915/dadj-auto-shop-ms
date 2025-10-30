@@ -73,7 +73,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 birthday: birthday ? new Date(birthday) : null,
                 profilePicture: profilePicture || null,
                 notes: notes || null,
-                loyaltyStatus: loyaltyStatus || 'regular',
+                loyaltyStatus: loyaltyStatus ? loyaltyStatus.toLowerCase() : 'regular',
                 totalVehicles: totalVehicles ? parseInt(totalVehicles) : 0,
             },
         });
@@ -203,7 +203,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 ...(email && { email }),
                 ...(notes && { notes }),
                 ...(typeof isActive === 'boolean' && { isActive }),
-                ...(loyaltyStatus && { loyaltyStatus }),
+                ...(loyaltyStatus && { loyaltyStatus: loyaltyStatus.toLowerCase() }),
                 ...(typeof serviceCount === 'number' && { serviceCount }),
                 ...(typeof totalSpent === 'number' && { totalSpent }),
                 ...(birthday !== undefined && { birthday: birthday ? new Date(birthday) : null }),
