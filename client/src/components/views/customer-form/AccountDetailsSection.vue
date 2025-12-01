@@ -7,14 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface Props {
   loyaltyStatus: string
-  totalVehicles: string
+  totalVehicles?: never // Removed
   errors: {
     loyaltyStatus: string
-    totalVehicles: string
   }
   touched: {
     loyaltyStatus: boolean
-    totalVehicles: boolean
   }
 }
 
@@ -22,9 +20,8 @@ defineProps<Props>()
 
 const emit = defineEmits<{
   'update:loyaltyStatus': [value: string]
-  'update:totalVehicles': [value: string]
-  'blur': [field: 'loyaltyStatus' | 'totalVehicles']
-  'input': [field: 'loyaltyStatus' | 'totalVehicles']
+  'blur': [field: 'loyaltyStatus']
+  'input': [field: 'loyaltyStatus']
 }>()
 </script>
 
@@ -80,47 +77,7 @@ const emit = defineEmits<{
           </p>
         </div>
 
-        <!-- Total Vehicles -->
-        <div class="space-y-2">
-          <Label for="total-vehicles">
-            Total Vehicles
-            <span class="text-destructive">*</span>
-          </Label>
-          <div class="relative">
-            <Input
-              id="total-vehicles"
-              :model-value="totalVehicles"
-              type="number"
-              min="1"
-              placeholder="1"
-              value="1"
-              :class="{
-                'border-destructive': touched.totalVehicles && errors.totalVehicles,
-                'border-green-500': touched.totalVehicles && !errors.totalVehicles && totalVehicles
-              }"
-              @blur="$emit('blur', 'totalVehicles')"
-              @input="(e) => {
-                $emit('update:totalVehicles', (e.target as HTMLInputElement).value)
-                touched.totalVehicles && $emit('input', 'totalVehicles')
-              }"
-            >
-              <template #prefix>
-                <Car class="h-4 w-4 text-muted-foreground" />
-              </template>
-            </Input>
-            <CheckCircle
-              v-if="touched.totalVehicles && !errors.totalVehicles && totalVehicles"
-              class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-500"
-            />
-            <AlertCircle
-              v-if="touched.totalVehicles && errors.totalVehicles"
-              class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-destructive"
-            />
-          </div>
-          <p v-if="touched.totalVehicles && errors.totalVehicles" class="text-sm text-destructive">
-            {{ errors.totalVehicles }}
-          </p>
-        </div>
+
       </div>
     </CardContent>
   </Card>

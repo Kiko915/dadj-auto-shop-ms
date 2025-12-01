@@ -1,7 +1,7 @@
 // server/index.js (Using ES6 'import' syntax)
 
 // Load environment variables immediately (ESM compatible way)
-import 'dotenv/config'; 
+import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
@@ -10,18 +10,19 @@ import authRoutes from './routes/auth.js';
 import protectedRoutes from './routes/protected.js';
 import customerRoutes from './routes/customers.js';
 import vehicleRoutes from './routes/vehicles.js'
+import inventoryRoutes from './routes/inventory.js'
 
 // --- Initialization ---
 const app = express();
 // Use const for variables
-const PORT = process.env.PORT || 4000; 
+const PORT = process.env.PORT || 4000;
 
 // --- Configuration ---
 
 // 1. CORS Middleware
 const corsOptions = {
     // Defined once using const/let
-    origin: ['http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173'], 
+    origin: ['http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
 };
@@ -34,11 +35,12 @@ app.use(express.json());
 // --- Routing ---
 
 // 3. Define Main API Routes
-app.use('/api', apiRoutes); 
-app.use('/api/auth', authRoutes); 
-app.use('/api/protected', protectedRoutes); 
+app.use('/api', apiRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/protected', protectedRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // 4. Root Route (Simple Check)
 app.get('/', (req, res) => {

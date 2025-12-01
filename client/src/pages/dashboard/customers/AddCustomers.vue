@@ -33,7 +33,6 @@ type FormState = {
   email: string
   birthday: Date | null
   loyaltyStatus: string
-  totalVehicles: string
   profilePicture: string | null
 }
 
@@ -67,7 +66,6 @@ const form = reactive<FormState>({
   email: '',
   birthday: null,
   loyaltyStatus: '',
-  totalVehicles: '0',
   profilePicture: null
 })
 
@@ -80,7 +78,6 @@ const resetForm = () => {
   form.email = ''
   form.birthday = null
   form.loyaltyStatus = ''
-  form.totalVehicles = '0'
   form.profilePicture = null
 }
 
@@ -155,7 +152,6 @@ const errors = reactive<Record<keyof FormState, string>>({
   email: '',
   birthday: '',
   loyaltyStatus: '',
-  totalVehicles: '',
   profilePicture: ''
 })
 
@@ -168,7 +164,6 @@ const touched = reactive<Record<keyof FormState, boolean>>({
   email: false,
   birthday: false,
   loyaltyStatus: false,
-  totalVehicles: false,
   profilePicture: false
 })
 
@@ -226,15 +221,6 @@ const validateField = (field: keyof FormState) => {
     case 'loyaltyStatus':
       if (!form.loyaltyStatus) {
         errors.loyaltyStatus = 'Loyalty status is required'
-      }
-      break
-
-    case 'totalVehicles':
-      const total = Number(form.totalVehicles)
-      if (form.totalVehicles === '' || form.totalVehicles === null) {
-        errors.totalVehicles = 'Total vehicles is required'
-      } else if (isNaN(total) || total < 0) {
-        errors.totalVehicles = 'Must be a non-negative number'
       }
       break
   }
@@ -298,7 +284,6 @@ const confirmSubmit = async () => {
       email: form.email.trim(),
       birthday: form.birthday ? form.birthday.toISOString() : undefined,
       loyaltyStatus: form.loyaltyStatus,
-      totalVehicles: Number(form.totalVehicles),
       profilePicture: form.profilePicture || undefined
     }
 
@@ -595,17 +580,13 @@ const cancelDiscard = () => {
         <!-- Account Details -->
         <AccountDetailsSection
           :loyaltyStatus="form.loyaltyStatus"
-          :totalVehicles="form.totalVehicles"
           :errors="{
-            loyaltyStatus: errors.loyaltyStatus,
-            totalVehicles: errors.totalVehicles
+            loyaltyStatus: errors.loyaltyStatus
           }"
           :touched="{
-            loyaltyStatus: touched.loyaltyStatus,
-            totalVehicles: touched.totalVehicles
+            loyaltyStatus: touched.loyaltyStatus
           }"
           @update:loyaltyStatus="(val) => form.loyaltyStatus = val"
-          @update:totalVehicles="(val) => form.totalVehicles = val"
           @blur="handleBlur"
           @input="handleInput"
         />
