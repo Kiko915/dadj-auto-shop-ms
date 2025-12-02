@@ -21,17 +21,22 @@ import {
 } from '@/components/ui/select'
 import { Loader2, RefreshCw, Plus, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { addInventoryItem, getCategories, getBrands } from '@/api/inventory'
+import { addInventoryItem, updateInventoryItem, getCategories, getBrands } from '@/api/inventory'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import { Separator } from '@/components/ui/separator'
 
 const props = defineProps({
-  open: Boolean
+  open: Boolean,
+  item: {
+    type: Object,
+    default: null
+  }
 })
 
 const emit = defineEmits(['update:open', 'success'])
 
 const isSubmitting = ref(false)
+const isImageUploading = ref(false)
 const existingCategories = ref([])
 const existingBrands = ref([])
 const isCustomCategory = ref(false)
@@ -49,7 +54,8 @@ const form = reactive({
   lowStockThreshold: 5,
   sku: '',
   description: '',
-  imageUrl: ''
+  imageUrl: '',
+  imageFileId: ''
 })
 
 const errors = reactive({
@@ -76,9 +82,31 @@ const fetchData = async () => {
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
     fetchData()
-    resetForm()
+    if (props.item) {
+      populateForm(props.item)
+    } else {
+      resetForm()
+    }
   }
 })
+
+const populateForm = (item) => {
+  form.name = item.name
+  form.brand = item.brand
+  form.category = item.category
+  form.quantity = item.quantity
+  form.buyingPrice = item.buyingPrice
+  form.sellingPrice = item.sellingPrice
+  form.lowStockThreshold = item.lowStockThreshold
+  form.sku = item.sku
+  form.description = item.description
+  form.imageUrl = item.imageUrl
+  form.imageFileId = item.imageFileId || ''
+  
+  // Handle custom values if needed, though for now we assume they exist in lists or are just set
+  isCustomBrand.value = false
+  isCustomCategory.value = false
+}
 
 const resetForm = () => {
   form.name = ''
@@ -93,6 +121,7 @@ const resetForm = () => {
   form.sku = ''
   form.description = ''
   form.imageUrl = ''
+  form.imageFileId = ''
   isCustomCategory.value = false
   isCustomBrand.value = false
   
@@ -155,19 +184,29 @@ const handleSubmit = async () => {
       category: isCustomCategory.value ? form.customCategory : form.category
     }
     
+    console.log('AddItemModal: Submitting payload:', payload)
+    
     // Remove temporary fields
     delete payload.customBrand
     delete payload.customCategory
 
-    await addInventoryItem(payload)
-    toast.success('Item Added', {
-      description: `${form.name} has been added to inventory.`
-    })
+    if (props.item) {
+      await updateInventoryItem(props.item.id, payload)
+      toast.success('Item Updated', {
+        description: `${form.name} has been updated.`
+      })
+    } else {
+      await addInventoryItem(payload)
+      toast.success('Item Added', {
+        description: `${form.name} has been added to inventory.`
+      })
+    }
+    
     emit('success')
     emit('update:open', false)
     resetForm()
   } catch (error) {
-    toast.error('Failed to Add Item', {
+    toast.error(props.item ? 'Failed to Update Item' : 'Failed to Add Item', {
       description: 'An error occurred while saving.'
     })
   } finally {
@@ -180,9 +219,9 @@ const handleSubmit = async () => {
   <Dialog :open="open" @update:open="(val) => $emit('update:open', val)">
     <DialogContent class="max-w-3xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle class="text-xl">Add New Product</DialogTitle>
+        <DialogTitle class="text-xl">{{ item ? 'Edit Product' : 'Add New Product' }}</DialogTitle>
         <DialogDescription>
-          Add a new item to your inventory. Fill in the details below.
+          {{ item ? 'Update the details of your inventory item.' : 'Add a new item to your inventory. Fill in the details below.' }}
         </DialogDescription>
       </DialogHeader>
 
@@ -343,15 +382,18 @@ const handleSubmit = async () => {
             v-model="form.imageUrl" 
             :error="errors.imageUrl"
             @update:error="(val) => errors.imageUrl = val"
+            @update:fileId="(val) => form.imageFileId = val"
+            @upload-start="isImageUploading = true"
+            @upload-end="isImageUploading = false"
           />
         </div>
       </div>
 
       <DialogFooter class="gap-2 sm:gap-0">
         <Button variant="outline" @click="$emit('update:open', false)">Cancel</Button>
-        <Button @click="handleSubmit" :disabled="isSubmitting" class="ml-2">
-          <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-          Save Product
+        <Button @click="handleSubmit" :disabled="isSubmitting || isImageUploading" class="ml-2">
+          <Loader2 v-if="isSubmitting || isImageUploading" class="mr-2 h-4 w-4 animate-spin" />
+          {{ isImageUploading ? 'Uploading Image...' : (item ? 'Update Product' : 'Save Product') }}
         </Button>
       </DialogFooter>
     </DialogContent>

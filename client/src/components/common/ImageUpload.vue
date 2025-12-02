@@ -16,7 +16,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'update:error'])
+const emit = defineEmits(['update:modelValue', 'update:error', 'upload-start', 'upload-end', 'update:fileId'])
 
 const imageFile = ref(null)
 const imagePreview = ref(props.modelValue || null)
@@ -73,6 +73,7 @@ const processFile = async (file) => {
 
 const uploadToImageKit = async (file) => {
   try {
+    emit('upload-start')
     isUploading.value = true
 
     const authResponse = await api.get('/imagekit-auth')
@@ -104,6 +105,7 @@ const uploadToImageKit = async (file) => {
 
     imagePreview.value = uploadData.url
     emit('update:modelValue', uploadData.url)
+    emit('update:fileId', uploadData.fileId)
 
     toast.success('Image Uploaded', {
       description: 'Product image uploaded successfully'
@@ -118,6 +120,7 @@ const uploadToImageKit = async (file) => {
     })
   } finally {
     isUploading.value = false
+    emit('upload-end')
   }
 }
 

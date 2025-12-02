@@ -17,7 +17,15 @@ const props = defineProps({
   brand: String,
   sortBy: String,
   sortOrder: String,
-  stockStatus: String
+  stockStatus: String,
+  categories: {
+    type: Array,
+    default: () => []
+  },
+  brands: {
+    type: Array,
+    default: () => []
+  }
 })
 
 const emit = defineEmits(['update:search', 'update:category', 'update:brand', 'update:sortBy', 'update:sortOrder', 'update:stockStatus', 'add-item'])
@@ -89,14 +97,25 @@ const toggleSortOrder = () => {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="All">All Categories</SelectItem>
-          <SelectItem value="Maintenance">Maintenance</SelectItem>
-          <SelectItem value="Engine">Engine</SelectItem>
-          <SelectItem value="Tires">Tires</SelectItem>
-          <SelectItem value="Brakes">Brakes</SelectItem>
-          <SelectItem value="Suspension">Suspension</SelectItem>
-          <SelectItem value="Electrical">Electrical</SelectItem>
-          <SelectItem value="Accessories">Accessories</SelectItem>
-          <SelectItem value="General">General</SelectItem>
+          <SelectItem v-for="cat in categories" :key="cat" :value="cat">
+            {{ cat }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+
+      <!-- Brand Filter -->
+      <Select v-model="localBrand">
+        <SelectTrigger class="w-[180px]">
+          <div class="flex items-center gap-2">
+            <Filter class="h-4 w-4" />
+            <SelectValue placeholder="Brand" />
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Brands</SelectItem>
+          <SelectItem v-for="b in brands" :key="b" :value="b">
+            {{ b }}
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>

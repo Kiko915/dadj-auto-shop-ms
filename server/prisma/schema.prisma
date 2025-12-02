@@ -151,6 +151,7 @@ model InventoryItem {
   
   // Optional Fields
   imageUrl          String?  // Marked optional as requested
+  imageFileId       String?  // ImageKit File ID for deletion
   description       String?  // For extra details (e.g., compatible car models)
   sku               String?  @unique // Barcode/Stock Keeping Unit (Good for future scanning)
   
