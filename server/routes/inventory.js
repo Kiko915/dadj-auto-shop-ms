@@ -271,6 +271,34 @@ router.patch('/:id/restock', authenticateToken, authorizeRoles(['staff', 'admin'
 });
 
 /**
+ * @route POST /api/inventory/bulk-delete
+ * @desc Delete multiple inventory items
+ * @access Admin
+ */
+router.post('/bulk-delete', authenticateToken, authorizeRoles(['admin']), async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'Invalid or empty IDs list' });
+        }
+
+        await prisma.inventoryItem.deleteMany({
+            where: {
+                id: {
+                    in: ids.map(id => parseInt(id))
+                }
+            }
+        });
+
+        res.json({ message: 'Items deleted successfully' });
+    } catch (error) {
+        console.error('Bulk Delete Error:', error);
+        res.status(500).json({ message: 'Failed to delete items' });
+    }
+});
+
+/**
  * @route DELETE /api/inventory/:id
  * @desc Delete an inventory item
  * @access Admin

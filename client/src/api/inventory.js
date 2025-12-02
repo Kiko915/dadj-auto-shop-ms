@@ -40,3 +40,8 @@ export const deleteInventoryItem = async (id) => {
     const response = await api.delete(`/inventory/${id}`)
     return response.data
 }
+
+export const bulkDeleteInventoryItems = async (ids) => {
+    const response = await api.post('/inventory/bulk-delete', { ids })
+    return response.data
+}

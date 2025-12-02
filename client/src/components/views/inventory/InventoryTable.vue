@@ -46,10 +46,42 @@ const props = defineProps({
   totalPages: {
     type: Number,
     default: 1
+  },
+  selectedItems: {
+    type: Array,
+    default: () => []
   }
 })
 
-const emit = defineEmits(['page-change', 'edit-item', 'delete-item', 'restock-success', 'view-item'])
+const emit = defineEmits(['page-change', 'edit-item', 'delete-item', 'restock-success', 'view-item', 'update:selectedItems'])
+
+const allSelected = computed({
+  get: () => props.items.length > 0 && props.items.every(item => props.selectedItems.includes(item.id)),
+  set: (val) => handleSelectAll(val)
+})
+
+const handleSelectAll = (checked) => {
+  if (checked) {
+    const allIds = props.items.map(item => item.id)
+    const newSelection = [...new Set([...props.selectedItems, ...allIds])]
+    emit('update:selectedItems', newSelection)
+  } else {
+    // Deselect all visible items
+    const visibleIds = props.items.map(item => item.id)
+    const newSelection = props.selectedItems.filter(id => !visibleIds.includes(id))
+    emit('update:selectedItems', newSelection)
+  }
+}
+
+const handleSelectItem = (checked, item) => {
+  let newSelection = [...props.selectedItems]
+  if (checked) {
+    newSelection.push(item.id)
+  } else {
+    newSelection = newSelection.filter(id => id !== item.id)
+  }
+  emit('update:selectedItems', newSelection)
+}
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-PH', {
@@ -74,6 +106,14 @@ const getInitials = (name) => {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead class="w-[40px]">
+              <input 
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                :checked="allSelected"
+                @change="(e) => handleSelectAll(e.target.checked)"
+              />
+            </TableHead>
             <TableHead class="w-[80px]">Image</TableHead>
             <TableHead>Item Name</TableHead>
             <TableHead>Brand</TableHead>
@@ -85,13 +125,13 @@ const getInitials = (name) => {
         </TableHeader>
         <TableBody>
           <TableRow v-if="loading">
-            <TableCell colspan="7" class="h-24 text-center">
+            <TableCell colspan="8" class="h-24 text-center">
               Loading inventory...
             </TableCell>
           </TableRow>
           
           <TableRow v-else-if="items.length === 0">
-            <TableCell colspan="7" class="h-32 text-center">
+            <TableCell colspan="8" class="h-32 text-center">
               <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <PackageOpen class="h-8 w-8" />
                 <p>No parts found. Specific brand parts like Ford might need to be added.</p>
@@ -100,6 +140,14 @@ const getInitials = (name) => {
           </TableRow>
 
           <TableRow v-else v-for="item in items" :key="item.id">
+            <TableCell>
+              <input 
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                :checked="selectedItems.includes(item.id)"
+                @change="(e) => handleSelectItem(e.target.checked, item)"
+              />
+            </TableCell>
             <!-- Image -->
             <TableCell>
               <Avatar class="h-10 w-10 rounded-lg border">

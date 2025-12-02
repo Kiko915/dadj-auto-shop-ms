@@ -5,8 +5,11 @@ import InventoryControls from '@/components/views/inventory/InventoryControls.vu
 import InventoryTable from '@/components/views/inventory/InventoryTable.vue'
 import AddItemModal from '@/components/views/inventory/AddItemModal.vue'
 import ItemDetailsSheet from '@/components/views/inventory/ItemDetailsSheet.vue'
-import { getInventory, getInventoryStats, deleteInventoryItem } from '@/api/inventory'
+import DeleteConfirmationModal from '@/components/views/inventory/DeleteConfirmationModal.vue'
+import { getInventory, getInventoryStats, deleteInventoryItem, bulkDeleteInventoryItems } from '@/api/inventory'
 import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Trash2 } from 'lucide-vue-next'
 
 // State
 const items = ref([])
@@ -27,7 +30,11 @@ const sortOrder = ref('desc')
 const stockStatus = ref('all')
 const showAddModal = ref(false)
 const showDetailsSheet = ref(false)
+const showDeleteModal = ref(false)
 const selectedItem = ref(null)
+const itemToDelete = ref(null)
+const selectedItems = ref([])
+const isBulkDelete = ref(false)
 
 // Fetch Data
 const fetchData = async () => {
@@ -142,20 +149,40 @@ const handleEditItem = (item) => {
   })
 }
 
-const handleDeleteItem = async (item) => {
-  if (!confirm(`Are you sure you want to delete ${item.name}?`)) return
+const handleDeleteItem = (item) => {
+  itemToDelete.value = item
+  isBulkDelete.value = false
+  showDeleteModal.value = true
+}
 
+const handleBulkDelete = () => {
+  if (selectedItems.value.length === 0) return
+  isBulkDelete.value = true
+  showDeleteModal.value = true
+}
+
+const confirmDelete = async () => {
   try {
-    await deleteInventoryItem(item.id)
-    toast.success('Item Deleted', {
-      description: `${item.name} has been removed.`
-    })
+    if (isBulkDelete.value) {
+      await bulkDeleteInventoryItems(selectedItems.value)
+      toast.success('Items Deleted', {
+        description: `${selectedItems.value.length} items have been removed.`
+      })
+      selectedItems.value = [] // Clear selection
+    } else {
+      await deleteInventoryItem(itemToDelete.value.id)
+      toast.success('Item Deleted', {
+        description: `${itemToDelete.value.name} has been removed.`
+      })
+    }
+    
     fetchData()
     fetchStats()
     showDetailsSheet.value = false // Close sheet if open
+    showDeleteModal.value = false
   } catch (error) {
     toast.error('Delete Failed', {
-      description: 'Could not delete item.'
+      description: 'Could not delete item(s).'
     })
   }
 }
@@ -170,8 +197,20 @@ onMounted(() => {
 <template>
   <div class="space-y-6">
     <div class="flex flex-col justify-between">
-      <h2 class="text-3xl font-bold tracking-tight">Inventory Management</h2>
-      <p class="text-muted-foreground">Manage your product inventory, track stock levels, and monitor product performance.</p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-3xl font-bold tracking-tight">Inventory Management</h2>
+          <p class="text-muted-foreground">Manage your product inventory, track stock levels, and monitor product performance.</p>
+        </div>
+        <Button 
+          v-if="selectedItems.length > 0" 
+          variant="destructive" 
+          @click="handleBulkDelete"
+        >
+          <Trash2 class="mr-2 h-4 w-4" />
+          Delete Selected ({{ selectedItems.length }})
+        </Button>
+      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -200,6 +239,7 @@ onMounted(() => {
       :loading="loading"
       :current-page="currentPage"
       :total-pages="totalPages"
+      v-model:selectedItems="selectedItems"
       @page-change="handlePageChange"
       @edit-item="handleEditItem"
       @delete-item="handleDeleteItem"
@@ -211,6 +251,12 @@ onMounted(() => {
     <AddItemModal 
       v-model:open="showAddModal" 
       @success="handleItemAdded" 
+    />
+
+    <DeleteConfirmationModal
+      v-model:open="showDeleteModal"
+      :item="isBulkDelete ? { name: `${selectedItems.length} items` } : itemToDelete"
+      @confirm="confirmDelete"
     />
 
     <ItemDetailsSheet
