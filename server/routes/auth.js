@@ -50,7 +50,7 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             { userId: user.id },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' },
+            { expiresIn: '12h' },
         )
 
         // 4.5 Create session record
@@ -80,7 +80,7 @@ router.post('/login', async (req, res) => {
                 ipAddress,
                 userAgent,
                 location: 'Philippines', // You can use IP geolocation API for accurate location
-                expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+                expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours
                 lastActivity: new Date()
             }
         });
