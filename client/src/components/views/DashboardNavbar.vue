@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import UserAvatar from '@/components/views/UserAvatar.vue'
+import NetworkStatus from '@/components/common/NetworkStatus.vue'
 import {
   Bell,
   User,
@@ -64,6 +65,9 @@ const handleLogout = async () => {
     
     <!-- Right Side Actions -->
     <div class="flex items-center gap-3">
+      <!-- Network Status -->
+      <NetworkStatus />
+
       <!-- Notifications -->
       <Button variant="ghost" size="icon" class="relative">
         <Bell class="h-5 w-5" />
