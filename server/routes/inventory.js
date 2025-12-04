@@ -436,13 +436,24 @@ const toTitleCase = (str) => {
 
 router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, res, next) => {
     upload.single('file')(req, res, (err) => {
-        if (err instanceof multer.MulterError) {
-            // A Multer error occurred when uploading.
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ message: 'File is too large. Maximum size is 5MB.' });
+        if (err) {
+            // Cleanup file if it exists (e.g. partial upload or limit reached after file creation)
+            if (req.file && req.file.path) {
+                try {
+                    fs.unlinkSync(req.file.path);
+                } catch (unlinkErr) {
+                    console.error('Failed to cleanup file after upload error:', unlinkErr);
+                }
             }
-            return res.status(400).json({ message: `Upload error: ${err.message}` });
-        } else if (err) {
+
+            if (err instanceof multer.MulterError) {
+                // A Multer error occurred when uploading.
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(400).json({ message: 'File is too large. Maximum size is 5MB.' });
+                }
+                return res.status(400).json({ message: `Upload error: ${err.message}` });
+            }
+
             // An unknown error occurred when uploading.
             return res.status(400).json({ message: err.message });
         }
