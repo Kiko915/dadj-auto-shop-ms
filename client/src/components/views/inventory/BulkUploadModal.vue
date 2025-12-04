@@ -26,12 +26,14 @@ const file = ref(null)
 const uploading = ref(false)
 const error = ref(null)
 const successCount = ref(0)
+const skippedItems = ref([])
 
 watch(() => props.open, (newVal) => {
   if (newVal) {
     file.value = null
     error.value = null
     successCount.value = 0
+    skippedItems.value = []
   }
 })
 
@@ -40,6 +42,7 @@ const handleFileChange = (e) => {
   if (selectedFile && selectedFile.type === 'text/csv') {
     file.value = selectedFile
     error.value = null
+    skippedItems.value = []
   } else {
     file.value = null
     error.value = 'Please select a valid CSV file.'
@@ -70,6 +73,7 @@ const handleUpload = async () => {
   uploading.value = true
   error.value = null
   successCount.value = 0
+  skippedItems.value = []
 
   const formData = new FormData()
   formData.append('file', file.value)
@@ -82,18 +86,32 @@ const handleUpload = async () => {
     })
 
     successCount.value = res.data.message
-    toast.success('Upload Successful', {
-      description: res.data.message
-    })
+    if (res.data.skipped && res.data.skipped.length > 0) {
+      skippedItems.value = res.data.skipped
+      toast.warning('Upload Completed with Issues', {
+        description: `Uploaded items, but skipped ${res.data.skipped.length} rows.`
+      })
+    } else {
+      toast.success('Upload Successful', {
+        description: res.data.message
+      })
+      setTimeout(() => {
+        emit('update:open', false)
+        file.value = null
+      }, 1500)
+    }
+    
     emit('success')
-    setTimeout(() => {
-      emit('update:open', false)
-      file.value = null
-    }, 1500)
 
   } catch (err) {
     console.error('Upload failed', err)
-    error.value = err.response?.data?.message || 'Failed to upload file.'
+    // Check if it's a 400 error with skipped items (e.g. no valid items found)
+    if (err.response?.data?.skipped) {
+        skippedItems.value = err.response.data.skipped
+        error.value = err.response.data.message
+    } else {
+        error.value = err.response?.data?.message || 'Failed to upload file.'
+    }
   } finally {
     uploading.value = false
   }
@@ -148,6 +166,19 @@ const handleUpload = async () => {
                 {{ successCount }}
             </AlertDescription>
         </Alert>
+
+        <div v-if="skippedItems.length > 0" class="rounded-md bg-yellow-50 p-4 border border-yellow-200">
+          <div class="flex items-center gap-2 text-yellow-800 mb-2">
+            <AlertCircle class="h-4 w-4" />
+            <h4 class="font-medium text-sm">Skipped Items ({{ skippedItems.length }})</h4>
+          </div>
+          <div class="max-h-40 overflow-y-auto text-xs text-yellow-700 space-y-1">
+            <div v-for="(item, index) in skippedItems" :key="index" class="flex gap-2">
+              <span class="font-mono font-semibold">Row {{ item.row }}:</span>
+              <span>{{ item.reason }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <DialogFooter>
