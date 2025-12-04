@@ -22,7 +22,6 @@ interface CustomerData {
   email: string
   birthday: Date | null
   loyaltyStatus: string
-  totalVehicles: string
   profilePicture: string | null
 }
 
@@ -167,10 +166,7 @@ const handleCancel = () => {
               <p class="text-sm text-muted-foreground">Loyalty Status</p>
               <p class="font-medium capitalize">{{ customerData.loyaltyStatus }}</p>
             </div>
-            <div class="space-y-1">
-              <p class="text-sm text-muted-foreground">Total Vehicles</p>
-              <p class="font-medium">{{ customerData.totalVehicles }}</p>
-            </div>
+
           </div>
         </div>
       </div>

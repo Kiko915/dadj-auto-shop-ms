@@ -26,7 +26,7 @@ const router = createRouter({
     },
     {
       path: '/auth/forgot-password',
-      name: 'forgot-password', 
+      name: 'forgot-password',
       component: () => import('@/pages/auth/ForgotPassword.vue')
     },
     {
@@ -69,6 +69,11 @@ const router = createRouter({
           path: 'customers/:id',
           name: 'customer-detail',
           component: () => import('@/pages/dashboard/customers/[id].vue'),
+        },
+        {
+          path: 'inventory',
+          name: 'inventory',
+          component: () => import('@/pages/dashboard/inventory/Inventory.vue'),
         }
       ]
     },
@@ -83,7 +88,7 @@ const router = createRouter({
 // Navigation guard to protect routes requiring authentication
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  
+
   // Check if route requires authentication
   if (to.meta.requiresAuth) {
     if (!authStore.isAuthenticated) {
@@ -92,12 +97,12 @@ router.beforeEach(async (to, from, next) => {
       next('/auth/login')
       return
     }
-    
+
     // Token exists, verify it's still valid by calling a protected endpoint
     try {
       // Try to fetch user profile to validate token using axios
       const response = await api.get('/protected/profile')
-      
+
       // If we get here, token is valid, proceed
       next()
     } catch (error) {

@@ -134,3 +134,29 @@ model Vehicle {
   @@index([customerId])
   @@map("vehicles")
 }
+
+model InventoryItem {
+  id                Int      @id @default(autoincrement())
+  name              String   // e.g., "Synthetic Oil 5W-30"
+  brand             String   // Vital: Client struggles finding parts for specific brands like "Ford" 
+  category          String   @default("General") // e.g., "Maintenance", "Tires", "Engine"
+  
+  // Stock Management
+  quantity          Int      @default(0) // Tracks current levels to "prevent overstocking" 
+  lowStockThreshold Int      @default(5) // Custom trigger for the "Red" warning on the dashboard
+  
+  // Financials
+  buyingPrice       Decimal  @db.Decimal(10, 2) // Required to calculate "overall profit" 
+  sellingPrice      Decimal  @db.Decimal(10, 2) // Required for generating receipts
+  
+  // Optional Fields
+  imageUrl          String?  // Marked optional as requested
+  description       String?  // For extra details (e.g., compatible car models)
+  sku               String?  @unique // Barcode/Stock Keeping Unit (Good for future scanning)
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("inventory_items")
+}
