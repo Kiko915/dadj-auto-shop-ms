@@ -31,6 +31,11 @@ export const addInventoryItem = async (itemData) => {
     return response.data
 }
 
+export const updateInventoryItem = async (id, itemData) => {
+    const response = await api.put(`/inventory/${id}`, itemData)
+    return response.data
+}
+
 export const restockItem = async (id, quantity) => {
     const response = await api.patch(`/inventory/${id}/restock`, { quantity })
     return response.data

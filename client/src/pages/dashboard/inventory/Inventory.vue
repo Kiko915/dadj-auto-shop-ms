@@ -4,12 +4,13 @@ import InventoryStats from '@/components/views/inventory/InventoryStats.vue'
 import InventoryControls from '@/components/views/inventory/InventoryControls.vue'
 import InventoryTable from '@/components/views/inventory/InventoryTable.vue'
 import AddItemModal from '@/components/views/inventory/AddItemModal.vue'
+import BulkUploadModal from '@/components/views/inventory/BulkUploadModal.vue'
 import ItemDetailsSheet from '@/components/views/inventory/ItemDetailsSheet.vue'
 import DeleteConfirmationModal from '@/components/views/inventory/DeleteConfirmationModal.vue'
-import { getInventory, getInventoryStats, deleteInventoryItem, bulkDeleteInventoryItems } from '@/api/inventory'
+import { getInventory, getInventoryStats, deleteInventoryItem, bulkDeleteInventoryItems, getCategories, getBrands } from '@/api/inventory'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, RefreshCw, Plus, Upload } from 'lucide-vue-next'
 
 // State
 const items = ref([])
@@ -28,13 +29,17 @@ const brand = ref('All')
 const sortBy = ref('updatedAt')
 const sortOrder = ref('desc')
 const stockStatus = ref('all')
-const showAddModal = ref(false)
+const showAddItemModal = ref(false)
+const showBulkUploadModal = ref(false)
 const showDetailsSheet = ref(false)
 const showDeleteModal = ref(false)
 const selectedItem = ref(null)
 const itemToDelete = ref(null)
+const itemToEdit = ref(null)
 const selectedItems = ref([])
 const isBulkDelete = ref(false)
+const categories = ref([])
+const brands = ref([])
 
 // Fetch Data
 const fetchData = async () => {
@@ -74,6 +79,16 @@ const fetchStats = async () => {
   }
 }
 
+const fetchFilters = async () => {
+  try {
+    const [cats, brnds] = await Promise.all([getCategories(), getBrands()])
+    categories.value = cats
+    brands.value = brnds
+  } catch (error) {
+    console.error('Failed to load filters', error)
+  }
+}
+
 // Event Handlers
 const handlePageChange = (page) => {
   currentPage.value = page
@@ -104,27 +119,41 @@ const handleBrandUpdate = (val) => {
 }
 
 const handleSortByUpdate = (val) => {
-  console.log('Inventory: handleSortByUpdate', val)
   sortBy.value = val
   fetchData()
 }
 
 const handleSortOrderUpdate = (val) => {
-  console.log('Inventory: handleSortOrderUpdate', val)
   sortOrder.value = val
   fetchData()
 }
 
 const handleStockStatusUpdate = (val) => {
-  console.log('Inventory: handleStockStatusUpdate', val)
   stockStatus.value = val
   currentPage.value = 1
   fetchData()
 }
 
-const handleItemAdded = () => {
+const handleAddItem = () => {
+  itemToEdit.value = null
+  showAddItemModal.value = true
+}
+
+const handleEditItem = (item) => {
+  itemToEdit.value = item
+  showAddItemModal.value = true
+}
+
+const handleItemSaved = () => {
   fetchData()
   fetchStats()
+  fetchFilters()
+}
+
+const handleBulkUploadSuccess = () => {
+  fetchData()
+  fetchStats()
+  fetchFilters()
 }
 
 const handleRestockSuccess = (updatedItem) => {
@@ -139,14 +168,6 @@ const handleRestockSuccess = (updatedItem) => {
 const handleViewItem = (item) => {
   selectedItem.value = item
   showDetailsSheet.value = true
-}
-
-const handleEditItem = (item) => {
-  // TODO: Implement edit functionality
-  console.log('Edit item:', item)
-  toast.info('Edit Feature', {
-    description: 'Edit functionality coming soon.'
-  })
 }
 
 const handleDeleteItem = (item) => {
@@ -191,6 +212,7 @@ const confirmDelete = async () => {
 onMounted(() => {
   fetchData()
   fetchStats()
+  fetchFilters()
 })
 </script>
 
@@ -202,14 +224,25 @@ onMounted(() => {
           <h2 class="text-3xl font-bold tracking-tight">Inventory Management</h2>
           <p class="text-muted-foreground">Manage your product inventory, track stock levels, and monitor product performance.</p>
         </div>
-        <Button 
-          v-if="selectedItems.length > 0" 
-          variant="destructive" 
-          @click="handleBulkDelete"
-        >
-          <Trash2 class="mr-2 h-4 w-4" />
-          Delete Selected ({{ selectedItems.length }})
-        </Button>
+        <div class="flex gap-2">
+          <Button 
+            v-if="selectedItems.length > 0" 
+            variant="destructive" 
+            @click="handleBulkDelete"
+          >
+            <Trash2 class="mr-2 h-4 w-4" />
+            Delete Selected ({{ selectedItems.length }})
+          </Button>
+          <Button variant="outline" @click="fetchData">
+            <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
+          </Button>
+          <Button variant="outline" @click="showBulkUploadModal = true">
+            <Upload class="mr-2 h-4 w-4" />
+            Bulk Upload
+          </Button>
+
+
+        </div>
       </div>
     </div>
 
@@ -224,13 +257,15 @@ onMounted(() => {
       :sort-by="sortBy"
       :sort-order="sortOrder"
       :stock-status="stockStatus"
+      :categories="categories"
+      :brands="brands"
       @update:search="handleSearchUpdate"
       @update:category="handleCategoryUpdate"
       @update:brand="handleBrandUpdate"
       @update:sort-by="handleSortByUpdate"
       @update:sort-order="handleSortOrderUpdate"
       @update:stock-status="handleStockStatusUpdate"
-      @add-item="showAddModal = true"
+      @add-item="handleAddItem"
     />
 
     <!-- Table -->
@@ -247,10 +282,16 @@ onMounted(() => {
       @restock-success="handleRestockSuccess"
     />
 
-    <!-- Add Item Modal -->
+    <!-- Add/Edit Item Modal -->
     <AddItemModal 
-      v-model:open="showAddModal" 
-      @success="handleItemAdded" 
+      v-model:open="showAddItemModal"
+      :item="itemToEdit"
+      @success="handleItemSaved"
+    />
+
+    <BulkUploadModal
+      v-model:open="showBulkUploadModal"
+      @success="handleBulkUploadSuccess"
     />
 
     <DeleteConfirmationModal

@@ -2,6 +2,13 @@ import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import prisma from '../db.js';
 
+import imagekit from '../config/imagekit.js';
+import multer from 'multer';
+import csv from 'csv-parser';
+import fs from 'fs';
+
+const upload = multer({ dest: 'uploads/' });
+
 const router = express.Router();
 
 /**
@@ -172,10 +179,10 @@ router.get('/brands', authenticateToken, authorizeRoles(['staff', 'admin']), asy
 });
 
 /**
- * @route GET /api/inventory/:id
- * @desc Get a single inventory item by ID
- * @access Staff, Admin
- */
+     * @route GET /api/inventory/:id
+     * @desc Get a single inventory item by ID
+     * @access Staff, Admin
+     */
 router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.params;
@@ -210,6 +217,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             sellingPrice,
             lowStockThreshold,
             imageUrl,
+            imageFileId,
             description,
             sku
         } = req.body;
@@ -228,15 +236,67 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
                 imageUrl,
+                imageFileId,
                 description,
                 sku
             }
         });
 
+
         res.status(201).json(newItem);
     } catch (error) {
         console.error('Add Inventory Item Error:', error);
         res.status(500).json({ message: 'Failed to add item' });
+    }
+});
+/**
+ * @route PUT /api/inventory/:id
+ * @desc Update an inventory item
+ * @access Staff, Admin
+ */
+router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`Backend: PUT /inventory/${id} body:`, req.body);
+        const {
+            name,
+            brand,
+            category,
+            quantity,
+            buyingPrice,
+            sellingPrice,
+            lowStockThreshold,
+            imageUrl,
+            imageFileId,
+            description,
+            sku
+        } = req.body;
+
+        if (!name || !brand || !buyingPrice || !sellingPrice) {
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        const updatedItem = await prisma.inventoryItem.update({
+            where: { id: parseInt(id) },
+            data: {
+                name,
+                brand,
+                category: category || 'General',
+                quantity: parseInt(quantity) || 0,
+                buyingPrice: parseFloat(buyingPrice),
+                sellingPrice: parseFloat(sellingPrice),
+                lowStockThreshold: parseInt(lowStockThreshold) || 5,
+                imageUrl,
+                imageFileId,
+                description,
+                sku
+            }
+        });
+
+        res.json(updatedItem);
+    } catch (error) {
+        console.error('Update Inventory Item Error:', error);
+        res.status(500).json({ message: 'Failed to update item' });
     }
 });
 
@@ -307,6 +367,27 @@ router.delete('/:id', authenticateToken, authorizeRoles(['admin']), async (req, 
     try {
         const { id } = req.params;
 
+        // 1. Find the item to get the imageFileId
+        const item = await prisma.inventoryItem.findUnique({
+            where: { id: parseInt(id) }
+        });
+
+        if (!item) {
+            return res.status(404).json({ message: 'Item not found' });
+        }
+
+        // 2. Delete image from ImageKit if it exists
+        if (item.imageFileId) {
+            try {
+                await imagekit.deleteFile(item.imageFileId);
+                console.log(`Deleted image ${item.imageFileId} for item ${id}`);
+            } catch (imageError) {
+                console.error('Failed to delete image from ImageKit:', imageError);
+                // Continue with item deletion even if image deletion fails
+            }
+        }
+
+        // 3. Delete the item from database
         await prisma.inventoryItem.delete({
             where: { id: parseInt(id) }
         });
@@ -316,6 +397,72 @@ router.delete('/:id', authenticateToken, authorizeRoles(['admin']), async (req, 
         console.error('Delete Item Error:', error);
         res.status(500).json({ message: 'Failed to delete item' });
     }
+});
+
+
+
+/**
+ * @route POST /api/inventory/bulk-upload
+ * @desc Bulk upload inventory items via CSV
+ * @access Admin
+ */
+const toTitleCase = (str) => {
+    return str.replace(
+        /\w\S*/g,
+        text => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase()
+    );
+};
+
+router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const results = [];
+    const errors = [];
+
+    fs.createReadStream(req.file.path)
+        .pipe(csv())
+        .on('data', (data) => {
+            // Basic Validation
+            if (!data.Name || !data.Brand || !data['Buying Price'] || !data['Selling Price']) {
+                // We can push to errors or just skip
+                // For now, let's try to process as much as possible
+                return;
+            }
+
+            results.push({
+                name: toTitleCase(data.Name),
+                brand: toTitleCase(data.Brand),
+                category: data.Category ? toTitleCase(data.Category) : 'General',
+                quantity: parseInt(data.Quantity) || 0,
+                buyingPrice: parseFloat(data['Buying Price']),
+                sellingPrice: parseFloat(data['Selling Price']),
+                lowStockThreshold: parseInt(data['Low Stock Threshold']) || 5,
+                description: data.Description || '',
+                sku: data.SKU || null
+            });
+        })
+        .on('end', async () => {
+            try {
+                // Cleanup file
+                fs.unlinkSync(req.file.path);
+
+                if (results.length === 0) {
+                    return res.status(400).json({ message: 'No valid items found in CSV' });
+                }
+
+                const count = await prisma.inventoryItem.createMany({
+                    data: results,
+                    skipDuplicates: true // Optional: skip if SKU conflicts
+                });
+
+                res.json({ message: `Successfully uploaded ${count.count} items` });
+            } catch (error) {
+                console.error('Bulk Upload Error:', error);
+                res.status(500).json({ message: 'Failed to process CSV' });
+            }
+        });
 });
 
 export default router;
