@@ -7,14 +7,24 @@ const intervalId = ref(null)
 
 const checkConnectivity = async () => {
   const start = Date.now()
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
+
   try {
     // Ping the server root
-    await fetch('http://localhost:4000/', { method: 'HEAD', cache: 'no-store' })
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+    await fetch(baseUrl, { 
+      method: 'HEAD', 
+      cache: 'no-store',
+      signal: controller.signal
+    })
     const end = Date.now()
     latency.value = end - start
   } catch (error) {
     console.error('Ping failed', error)
     latency.value = 999 // High latency on error
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
