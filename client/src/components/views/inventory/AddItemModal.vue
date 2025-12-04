@@ -103,9 +103,20 @@ const populateForm = (item) => {
   form.imageUrl = item.imageUrl
   form.imageFileId = item.imageFileId || ''
   
-  // Handle custom values if needed, though for now we assume they exist in lists or are just set
-  isCustomBrand.value = false
-  isCustomCategory.value = false
+  // Handle custom values
+  if (form.brand && !existingBrands.value.includes(form.brand)) {
+    isCustomBrand.value = true
+    form.customBrand = form.brand
+  } else {
+    isCustomBrand.value = false
+  }
+
+  if (form.category && !existingCategories.value.includes(form.category)) {
+    isCustomCategory.value = true
+    form.customCategory = form.category
+  } else {
+    isCustomCategory.value = false
+  }
 }
 
 const resetForm = () => {

@@ -7,7 +7,25 @@ import multer from 'multer';
 import csv from 'csv-parser';
 import fs from 'fs';
 
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+    dest: 'uploads/',
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept CSV files
+        if (
+            file.mimetype === 'text/csv' ||
+            file.mimetype === 'application/vnd.ms-excel' ||
+            file.mimetype === 'text/plain' ||
+            file.originalname.endsWith('.csv')
+        ) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only CSV files are allowed'), false);
+        }
+    }
+});
 
 const router = express.Router();
 
@@ -296,6 +314,9 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
         res.json(updatedItem);
     } catch (error) {
         console.error('Update Inventory Item Error:', error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Item not found' });
+        }
         res.status(500).json({ message: 'Failed to update item' });
     }
 });
@@ -413,21 +434,53 @@ const toTitleCase = (str) => {
     );
 };
 
-router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), upload.single('file'), async (req, res) => {
+router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            // A Multer error occurred when uploading.
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({ message: 'File is too large. Maximum size is 5MB.' });
+            }
+            return res.status(400).json({ message: `Upload error: ${err.message}` });
+        } else if (err) {
+            // An unknown error occurred when uploading.
+            return res.status(400).json({ message: err.message });
+        }
+        // Everything went fine.
+        next();
+    });
+}, async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
     }
 
     const results = [];
-    const errors = [];
+    const skipped = [];
+    let rowIndex = 0;
 
-    fs.createReadStream(req.file.path)
+    const stream = fs.createReadStream(req.file.path)
         .pipe(csv())
         .on('data', (data) => {
+            rowIndex++;
             // Basic Validation
             if (!data.Name || !data.Brand || !data['Buying Price'] || !data['Selling Price']) {
-                // We can push to errors or just skip
-                // For now, let's try to process as much as possible
+                skipped.push({ row: rowIndex, reason: 'Missing required fields', data });
+                return;
+            }
+
+            // Parse and Validate Numeric Fields
+            const buyingPrice = parseFloat(data['Buying Price']);
+            const sellingPrice = parseFloat(data['Selling Price']);
+            const quantity = parseInt(data.Quantity);
+            const lowStockThreshold = parseInt(data['Low Stock Threshold']);
+
+            // Validate Prices (Critical - Skip if invalid)
+            if (!Number.isFinite(buyingPrice) || buyingPrice < 0) {
+                skipped.push({ row: rowIndex, reason: 'Invalid Buying Price', data });
+                return;
+            }
+            if (!Number.isFinite(sellingPrice) || sellingPrice < 0) {
+                skipped.push({ row: rowIndex, reason: 'Invalid Selling Price', data });
                 return;
             }
 
@@ -435,21 +488,31 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), upload
                 name: toTitleCase(data.Name),
                 brand: toTitleCase(data.Brand),
                 category: data.Category ? toTitleCase(data.Category) : 'General',
-                quantity: parseInt(data.Quantity) || 0,
-                buyingPrice: parseFloat(data['Buying Price']),
-                sellingPrice: parseFloat(data['Selling Price']),
-                lowStockThreshold: parseInt(data['Low Stock Threshold']) || 5,
+                quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : 0,
+                buyingPrice: buyingPrice,
+                sellingPrice: sellingPrice,
+                lowStockThreshold: Number.isFinite(lowStockThreshold) && lowStockThreshold > 0 ? lowStockThreshold : 5,
                 description: data.Description || '',
                 sku: data.SKU || null
             });
         })
+        .on('error', (error) => {
+            console.error('CSV Parsing Error:', error);
+            // Cleanup file
+            try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+            return res.status(400).json({ message: 'Failed to parse CSV file' });
+        })
         .on('end', async () => {
             try {
                 // Cleanup file
-                fs.unlinkSync(req.file.path);
+                try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
 
                 if (results.length === 0) {
-                    return res.status(400).json({ message: 'No valid items found in CSV' });
+                    return res.status(400).json({
+                        message: 'No valid items found in CSV',
+                        skippedCount: skipped.length,
+                        skipped
+                    });
                 }
 
                 const count = await prisma.inventoryItem.createMany({
@@ -457,7 +520,11 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), upload
                     skipDuplicates: true // Optional: skip if SKU conflicts
                 });
 
-                res.json({ message: `Successfully uploaded ${count.count} items` });
+                res.json({
+                    message: `Successfully uploaded ${count.count} items`,
+                    skippedCount: skipped.length,
+                    skipped
+                });
             } catch (error) {
                 console.error('Bulk Upload Error:', error);
                 res.status(500).json({ message: 'Failed to process CSV' });
