@@ -468,6 +468,7 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, 
     const results = [];
     const skipped = [];
     let rowIndex = 0;
+    let responseSent = false;
 
     const stream = fs.createReadStream(req.file.path)
         .pipe(csv())
@@ -508,12 +509,18 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, 
             });
         })
         .on('error', (error) => {
+            if (responseSent) return;
+            responseSent = true;
+
             console.error('CSV Parsing Error:', error);
             // Cleanup file
             try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
             return res.status(400).json({ message: 'Failed to parse CSV file' });
         })
         .on('end', async () => {
+            if (responseSent) return;
+            responseSent = true;
+
             try {
                 // Cleanup file
                 try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
