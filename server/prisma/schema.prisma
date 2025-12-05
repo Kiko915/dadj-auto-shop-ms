@@ -89,6 +89,7 @@ model Customer {
   email          String?   @unique
   birthday       DateTime? @map("birthday") @db.Date
   profilePicture String?   @map("customer_profile_picture") // ImageKit URL
+  imageFileId    String?   @map("image_file_id") // ImageKit File ID
   notes          String?   @db.Text
   isActive       Boolean   @default(true) @map("is_active")
   loyaltyStatus  String    @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP

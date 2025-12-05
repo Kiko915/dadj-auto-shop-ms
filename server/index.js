@@ -11,6 +11,7 @@ import protectedRoutes from './routes/protected.js';
 import customerRoutes from './routes/customers.js';
 import vehicleRoutes from './routes/vehicles.js'
 import inventoryRoutes from './routes/inventory.js'
+import filesRoutes from './routes/files.js'
 
 // --- Initialization ---
 const app = express();
@@ -41,6 +42,7 @@ app.use('/api/protected', protectedRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/files', filesRoutes);
 
 // 4. Root Route (Simple Check)
 app.get('/', (req, res) => {
