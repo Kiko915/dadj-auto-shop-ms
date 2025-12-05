@@ -10,31 +10,31 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url  	    = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  password      String
-  role          String   @default("user") // user, admin, mechanic
-  isActive      Boolean  @default(true)
+  id             String  @id @default(cuid())
+  email          String  @unique
+  name           String?
+  password       String
+  role           String  @default("user") // user, admin, mechanic
+  isActive       Boolean @default(true)
   profilePicture String? // URL or path to profile picture
-  
+
   // Address fields
-  region        String?
-  province      String?
-  city          String?
-  barangay      String?
-  street        String?
-  country       String   @default("Philippines")
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  region   String?
+  province String?
+  city     String?
+  barangay String?
+  street   String?
+  country  String  @default("Philippines")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   passwordResets PasswordReset[]
@@ -46,13 +46,14 @@ model User {
 model PasswordReset {
   id        String   @id @default(cuid())
   email     String
+  userId    String
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-  
+
   // Relations
-  user      User     @relation(fields: [email], references: [email])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_resets")
 }
@@ -61,17 +62,17 @@ model UserSession {
   id           String   @id @default(cuid())
   userId       String
   token        String   @unique
-  deviceInfo   String?  // e.g., "Windows 10"
-  browser      String?  // e.g., "Chrome 120"
+  deviceInfo   String? // e.g., "Windows 10"
+  browser      String? // e.g., "Chrome 120"
   ipAddress    String?
   userAgent    String?
-  location     String?  // e.g., "Philippines"
+  location     String? // e.g., "Philippines"
   lastActivity DateTime @default(now())
   expiresAt    DateTime
   createdAt    DateTime @default(now())
-  
+
   // Relations
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -79,85 +80,75 @@ model UserSession {
 }
 
 model Customer {
-  id            String   @id @default(cuid()) @map("customer_id")
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
-  middleName    String?  @map("middle_name")
-  suffix        String?
-  phoneNumber   String   @map("phone_number")
-  email         String?  @unique
-  birthday      DateTime? @map("birthday") @db.Date
-  profilePicture String? @map("customer_profile_picture") // ImageKit URL
-  notes         String?  @db.Text
-  isActive      Boolean  @default(true) @map("is_active")
-  loyaltyStatus String   @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP
-  totalVehicles Int      @default(0) @map("total_vehicles")
-  serviceCount  Int      @default(0) @map("service_count")
-  totalSpent    Decimal  @default(0) @db.Decimal(10, 2) @map("total_spent")
-  
-  dateCreated   DateTime @default(now()) @map("date_created")
-  lastModified  DateTime @updatedAt @map("last_modified")
+  id             String    @id @default(cuid()) @map("customer_id")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  middleName     String?   @map("middle_name")
+  suffix         String?
+  phoneNumber    String    @map("phone_number")
+  email          String?   @unique
+  birthday       DateTime? @map("birthday") @db.Date
+  profilePicture String?   @map("customer_profile_picture") // ImageKit URL
+  notes          String?   @db.Text
+  isActive       Boolean   @default(true) @map("is_active")
+  loyaltyStatus  String    @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP
+  totalVehicles  Int       @default(0) @map("total_vehicles")
+  serviceCount   Int       @default(0) @map("service_count")
+  totalSpent     Decimal   @default(0) @map("total_spent") @db.Decimal(10, 2)
 
-  // Relations
-  vehicles      Vehicle[]
+  dateCreated  DateTime  @default(now()) @map("date_created")
+  lastModified DateTime  @updatedAt @map("last_modified")
+  vehicles     Vehicle[]
 
   @@map("customers")
 }
 
-enum VehicleType {
-  Sedan
-  SUV
-  Truck
-  Van
-  Tricycle
-  Motorcycle
-  Jeepney
-
-}
-
 model Vehicle {
-  id            String       @id @default(cuid()) @map("vehicle_id")
-  customerId    String       @map("customer_id")
-  licensePlate  String       @unique @map("license_plate") @db.VarChar(20)
-  make          String       @db.VarChar(100)
-  model         String       @db.VarChar(100)
-  year          Int?
-  vin           String?      @unique @db.VarChar(17)
-  mileage       Int?
-  vehicleType   VehicleType? @map("vehicle_type")
-  notes         String?      @db.Text
-  dateRegistered DateTime    @default(now()) @map("date_registered")
-  
+  id             String   @id @default(cuid()) @map("vehicle_id")
+  customerId     String   @map("customer_id")
+  licensePlate   String   @unique @map("license_plate") @db.VarChar(20)
+  make           String   @db.VarChar(100)
+  model          String   @db.VarChar(100)
+  year           Int?
+  vin            String?  @unique @db.VarChar(17)
+  mileage        Int?
+  vehicleType    String?  @map("vehicle_type")
+  color          String?  @db.VarChar(50)
+  notes          String?  @db.Text
+  imageUrl       String?  @map("image_url") // Optional vehicle image
+  imageFileId    String?  @map("image_file_id") // ImageKit File ID
+  dateRegistered DateTime @default(now()) @map("date_registered")
+
   // Relations
-  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@map("vehicles")
 }
 
 model InventoryItem {
-  id                Int      @id @default(autoincrement())
-  name              String   // e.g., "Synthetic Oil 5W-30"
-  brand             String   // Vital: Client struggles finding parts for specific brands like "Ford" 
-  category          String   @default("General") // e.g., "Maintenance", "Tires", "Engine"
-  
+  id       Int    @id @default(autoincrement())
+  name     String // e.g., "Synthetic Oil 5W-30"
+  brand    String // Vital: Client struggles finding parts for specific brands like "Ford" 
+  category String @default("General") // e.g., "Maintenance", "Tires", "Engine"
+
   // Stock Management
-  quantity          Int      @default(0) // Tracks current levels to "prevent overstocking" 
-  lowStockThreshold Int      @default(5) // Custom trigger for the "Red" warning on the dashboard
-  
+  quantity          Int @default(0) // Tracks current levels to "prevent overstocking" 
+  lowStockThreshold Int @default(5) // Custom trigger for the "Red" warning on the dashboard
+
   // Financials
-  buyingPrice       Decimal  @db.Decimal(10, 2) // Required to calculate "overall profit" 
-  sellingPrice      Decimal  @db.Decimal(10, 2) // Required for generating receipts
-  
+  buyingPrice  Decimal @db.Decimal(10, 2) // Required to calculate "overall profit" 
+  sellingPrice Decimal @db.Decimal(10, 2) // Required for generating receipts
+
   // Optional Fields
-  imageUrl          String?  // Marked optional as requested
-  imageFileId       String?  // ImageKit File ID for deletion
-  description       String?  // For extra details (e.g., compatible car models)
-  sku               String?  @unique // Barcode/Stock Keeping Unit (Good for future scanning)
-  
+  imageUrl    String? // Marked optional as requested
+  imageFileId String? // ImageKit File ID for deletion
+  description String? // For extra details (e.g., compatible car models)
+  sku         String? @unique // Barcode/Stock Keeping Unit (Good for future scanning)
+
   // Metadata
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("inventory_items")
 }

@@ -3,32 +3,28 @@ import { ref, watch } from 'vue'
 import { 
   Sheet, 
   SheetContent, 
-  SheetHeader, 
-  SheetTitle, 
-  SheetDescription,
-  SheetFooter
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { 
-  Package, 
-  Tag, 
-  DollarSign, 
-  AlertTriangle, 
+  Car, 
   Calendar, 
-  Barcode,
   Edit,
   Trash2,
   Image as ImageIcon,
-  Copy,
-  Check
+  Info,
+  Hash,
+  Gauge,
+  Palette,
+  FileText
 } from 'lucide-vue-next'
-import { getInventoryItem } from '@/api/inventory'
+import { getVehicle } from '@/api/vehicles'
 
 const props = defineProps({
   open: Boolean,
-  itemId: [Number, String]
+  vehicleId: [String],
+  vehicle: [Object] // Optional: pass vehicle object directly to avoid fetch if desired, but we'll fetch for freshness
 })
 
 const emit = defineEmits(['update:open', 'edit', 'delete'])
@@ -36,51 +32,52 @@ const emit = defineEmits(['update:open', 'edit', 'delete'])
 const item = ref(null)
 const isLoading = ref(false)
 const error = ref(null)
+const resetTimeout = ref(null)
 
-const fetchItemDetails = async () => {
-  if (!props.itemId) return
+const fetchVehicleDetails = async () => {
+  // If we have a vehicle object passed and no ID (or same ID), we could use it.
+  // But let's prefer fetching for latest data if ID is present.
+  if (!props.vehicleId) {
+    if (props.vehicle) {
+      item.value = props.vehicle
+      return
+    }
+    return
+  }
   
   isLoading.value = true
   error.value = null
   try {
-    item.value = await getInventoryItem(props.itemId)
+    const response = await getVehicle(props.vehicleId)
+    item.value = response.vehicle
   } catch (err) {
-    console.error('Failed to fetch item details:', err)
-    error.value = 'Failed to load item details.'
+    console.error('Failed to fetch vehicle details:', err)
+    error.value = 'Failed to load vehicle details.'
   } finally {
     isLoading.value = false
   }
 }
 
 watch(() => props.open, (isOpen) => {
-  if (isOpen && props.itemId) {
-    fetchItemDetails()
+  if (isOpen) {
+    if (resetTimeout.value) {
+      clearTimeout(resetTimeout.value)
+      resetTimeout.value = null
+    }
+    fetchVehicleDetails()
   } else {
     // Reset state when closed
-    setTimeout(() => {
+    if (resetTimeout.value) clearTimeout(resetTimeout.value)
+    
+    resetTimeout.value = setTimeout(() => {
       item.value = null
       error.value = null
+      resetTimeout.value = null
     }, 300)
   }
 })
 
-// Local formatter if utility doesn't exist
-const formatMoney = (amount) => {
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP'
-  }).format(amount)
-}
-
 import formatDate from '@/utils/formatDate'
-const copied = ref(false)
-const copySku = async () => {
-  if (item.value?.sku) {
-    await navigator.clipboard.writeText(item.value.sku)
-    copied.value = true
-    setTimeout(() => copied.value = false, 2000)
-  }
-}
 </script>
 
 <template>
@@ -94,9 +91,9 @@ const copySku = async () => {
 
       <!-- Error State -->
       <div v-else-if="error" class="flex flex-col items-center justify-center h-full space-y-4 text-center p-6">
-        <AlertTriangle class="h-12 w-12 text-destructive/50" />
+        <Info class="h-12 w-12 text-destructive/50" />
         <p class="text-destructive font-medium">{{ error }}</p>
-        <Button variant="outline" @click="fetchItemDetails">Try Again</Button>
+        <Button variant="outline" @click="fetchVehicleDetails">Try Again</Button>
       </div>
 
       <!-- Content -->
@@ -106,19 +103,18 @@ const copySku = async () => {
           <img 
             v-if="item.imageUrl" 
             :src="item.imageUrl" 
-            :alt="item.name" 
+            :alt="`${item.make} ${item.model}`" 
             class="h-full w-full object-cover"
           />
-          <ImageIcon v-else class="h-16 w-16 text-muted-foreground/30" />
+          <Car v-else class="h-16 w-16 text-muted-foreground/30" />
           
           <!-- Floating Status Badge -->
           <div class="absolute top-4 right-4">
             <Badge 
-              :variant="item.quantity <= item.lowStockThreshold ? 'destructive' : 'secondary'" 
-              class="px-3 py-1 text-sm font-medium shadow-lg backdrop-blur-md"
-              :class="item.quantity > item.lowStockThreshold ? 'bg-green-500/90 text-white hover:bg-green-600' : ''"
+              variant="secondary" 
+              class="px-3 py-1 text-sm font-medium shadow-lg backdrop-blur-md bg-background/80"
             >
-              {{ item.quantity <= item.lowStockThreshold ? 'Low Stock' : 'In Stock' }}
+              {{ item.year || 'N/A' }}
             </Badge>
           </div>
         </div>
@@ -128,74 +124,68 @@ const copySku = async () => {
             <!-- Header Info -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold tracking-wider text-primary uppercase">{{ item.brand }}</span>
-                <Badge variant="outline" class="text-xs">{{ item.category }}</Badge>
+                <span class="text-sm font-bold tracking-wider text-primary uppercase">{{ item.make }}</span>
+                <Badge variant="outline" class="text-xs">{{ item.vehicleType || 'Unknown Type' }}</Badge>
               </div>
-              <h2 class="text-3xl font-bold leading-tight text-foreground">{{ item.name }}</h2>
+              <h2 class="text-3xl font-bold leading-tight text-foreground">{{ item.model }}</h2>
+              <div class="flex items-center gap-2 text-muted-foreground">
+                <div class="px-2 py-1 bg-muted rounded text-sm font-mono font-medium text-foreground">
+                  {{ item.licensePlate }}
+                </div>
+              </div>
             </div>
 
             <!-- Key Stats Grid -->
             <div class="grid grid-cols-2 gap-4">
               <div class="p-4 rounded-xl bg-muted/50 border border-border/50 space-y-1">
                 <div class="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  <Package class="h-3.5 w-3.5" /> Stock Level
+                  <Gauge class="h-3.5 w-3.5" /> Mileage
                 </div>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-2xl font-bold tabular-nums">{{ item.quantity }}</span>
-                  <span class="text-sm text-muted-foreground">units</span>
-                </div>
-                <div class="h-1.5 w-full bg-border/50 rounded-full overflow-hidden mt-2">
-                  <div 
-                    class="h-full rounded-full transition-all duration-500"
-                    :class="item.quantity <= item.lowStockThreshold ? 'bg-destructive' : 'bg-green-500'"
-                    :style="{ width: `${Math.min((item.quantity / (item.lowStockThreshold * 3)) * 100, 100)}%` }"
-                  />
+                  <span class="text-2xl font-bold tabular-nums">{{ item.mileage ? item.mileage.toLocaleString() : '—' }}</span>
+                  <span class="text-sm text-muted-foreground">km</span>
                 </div>
               </div>
 
               <div class="p-4 rounded-xl bg-muted/50 border border-border/50 space-y-1">
                 <div class="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  <DollarSign class="h-3.5 w-3.5" /> Selling Price
+                  <Palette class="h-3.5 w-3.5" /> Color
                 </div>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-2xl font-bold text-primary tabular-nums">{{ formatMoney(item.sellingPrice) }}</span>
+                  <span class="text-lg font-medium text-foreground">{{ item.color || 'N/A' }}</span>
                 </div>
-                <p class="text-xs text-muted-foreground mt-1">
-                  Cost: {{ formatMoney(item.buyingPrice) }}
-                </p>
               </div>
             </div>
 
-            <!-- SKU & Details -->
+            <!-- Details List -->
             <div class="space-y-6">
-              <div v-if="item.sku" class="flex items-center justify-between p-3 rounded-lg border border-dashed border-border bg-background">
+              <!-- VIN -->
+              <div v-if="item.vin" class="flex items-center justify-between p-3 rounded-lg border border-dashed border-border bg-background">
                 <div class="flex items-center gap-3">
                   <div class="h-8 w-8 rounded-md bg-muted flex items-center justify-center">
-                    <Barcode class="h-4 w-4 text-muted-foreground" />
+                    <Hash class="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div class="space-y-0.5">
-                    <p class="text-xs text-muted-foreground font-medium">SKU / Part Number</p>
-                    <p class="font-mono text-sm font-bold">{{ item.sku }}</p>
+                    <p class="text-xs text-muted-foreground font-medium">VIN (Vehicle Identification Number)</p>
+                    <p class="font-mono text-sm font-bold">{{ item.vin }}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-foreground" @click="copySku">
-                  <Check v-if="copied" class="h-4 w-4 text-green-500" />
-                  <Copy v-else class="h-4 w-4" />
-                </Button>
               </div>
 
-              <div v-if="item.description" class="space-y-3">
+              <!-- Notes -->
+              <div v-if="item.notes" class="space-y-3">
                 <h3 class="text-sm font-semibold flex items-center gap-2">
-                  <Tag class="h-4 w-4 text-primary" /> Description
+                  <FileText class="h-4 w-4 text-primary" /> Notes
                 </h3>
                 <p class="text-sm leading-relaxed text-muted-foreground bg-muted/30 p-4 rounded-lg">
-                  {{ item.description }}
+                  {{ item.notes }}
                 </p>
               </div>
 
+              <!-- Metadata -->
               <div class="flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar class="h-3.5 w-3.5" />
-                <span>Last updated on {{ formatDate(item.updatedAt) }}</span>
+                <span>Registered on {{ formatDate(item.dateRegistered) }}</span>
               </div>
             </div>
           </div>

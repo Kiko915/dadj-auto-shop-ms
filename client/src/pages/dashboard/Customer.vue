@@ -327,8 +327,14 @@ const nextPage = () => {
         </div>
       </div>
 
-      <div v-else-if="filteredCustomers.length === 0" class="p-8 text-center">
-        <p class="text-muted-foreground">No customers found.</p>
+      <div v-else-if="filteredCustomers.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
+        <div class="mb-4">
+          <img src="/illus/mechanic_404.png" alt="No customers found" class="h-48 w-auto opacity-90" />
+        </div>
+        <h3 class="text-lg font-semibold">No customers found</h3>
+        <p class="text-sm text-muted-foreground max-w-sm mt-1">
+          We couldn't find any customers matching your search. Try adjusting your filters or search terms.
+        </p>
       </div>
 
       <div v-else class="overflow-x-auto">

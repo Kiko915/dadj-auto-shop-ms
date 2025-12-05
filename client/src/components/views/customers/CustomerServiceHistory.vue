@@ -22,13 +22,7 @@ const emit = defineEmits<{
   viewReceipt: [serviceId: string]
 }>()
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+import formatDate from '@/utils/formatDate'
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-PH', {

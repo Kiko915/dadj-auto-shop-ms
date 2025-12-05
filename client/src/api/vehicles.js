@@ -8,7 +8,7 @@ import api from './index'
  */
 export const getCustomerVehicles = async (customerId) => {
   try {
-    const response = await api.get(`/customers/${customerId}/vehicles`)
+    const response = await api.get(`/vehicles/customer/${customerId}`)
     return response.data
   } catch (error) {
     throw error
@@ -45,7 +45,7 @@ export const getVehicle = async (vehicleId) => {
  */
 export const createVehicle = async (vehicleData) => {
   try {
-    const response = await api.post('/vehicles', vehicleData)
+    const response = await api.post(`/vehicles/customer/${vehicleData.customerId}`, vehicleData)
     return response.data
   } catch (error) {
     throw error

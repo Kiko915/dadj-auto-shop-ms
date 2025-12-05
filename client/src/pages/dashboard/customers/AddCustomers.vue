@@ -65,7 +65,7 @@ const form = reactive<FormState>({
   phoneNumber: '',
   email: '',
   birthday: null,
-  loyaltyStatus: '',
+  loyaltyStatus: 'Regular',
   profilePicture: null
 })
 
@@ -77,7 +77,7 @@ const resetForm = () => {
   form.phoneNumber = ''
   form.email = ''
   form.birthday = null
-  form.loyaltyStatus = ''
+  form.loyaltyStatus = 'Regular'
   form.profilePicture = null
 }
 

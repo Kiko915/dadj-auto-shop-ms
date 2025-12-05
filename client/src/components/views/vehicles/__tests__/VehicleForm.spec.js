@@ -24,14 +24,14 @@ describe('VehicleForm', () => {
       model: 'Corolla',
       year: '2018',
       vehicleType: 'Sedan',
-      currentMileage: '45000',
+      mileage: '45000',
       color: 'Blue',
       vin: 'VIN123456789',
-      internalNotes: 'Customer prefers morning slots',
+      notes: 'Customer prefers morning slots',
     }
 
     const wrapper = mount(VehicleForm, {
-      props: { modelValue: true, vehicle: initialVehicle },
+      props: { open: true, vehicle: initialVehicle },
       global: {
         components: {
           Dialog: SlotWrapper,
@@ -46,11 +46,11 @@ describe('VehicleForm', () => {
         },
       },
     })
-  // Simulate the form emitting a save (we provide the initial vehicle)
-  await wrapper.vm.$emit('save', initialVehicle)
+    // Simulate the form emitting a save (we provide the initial vehicle)
+    await wrapper.vm.$emit('save', initialVehicle)
 
-  expect(wrapper.emitted()).toHaveProperty('save')
-  const payload = wrapper.emitted('save')[0][0]
-  expect(payload).toMatchObject(initialVehicle)
+    expect(wrapper.emitted()).toHaveProperty('save')
+    const payload = wrapper.emitted('save')[0][0]
+    expect(payload).toMatchObject(initialVehicle)
   })
 })
