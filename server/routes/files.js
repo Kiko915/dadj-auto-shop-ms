@@ -18,12 +18,9 @@ router.delete('/:fileId', authenticateToken, authorizeRoles(['staff', 'admin']),
     try {
         const { fileId } = req.params;
 
-        if (!fileId) {
-            return res.status(400).json({
-                message: 'File ID is required',
-                error: 'MISSING_FILE_ID',
-            });
-        }
+        // NOTE: Strictly restricted to Staff and Admin.
+        // Granular ownership check is not implemented. Privileged users are trusted
+        // to manage files. This risk is accepted for the current scope.
 
         await imagekit.deleteFile(fileId);
 
@@ -32,9 +29,12 @@ router.delete('/:fileId', authenticateToken, authorizeRoles(['staff', 'admin']),
         });
     } catch (error) {
         console.error('Delete File Error:', error);
-        return res.status(500).json({
+
+        const statusCode = error.status || error.statusCode || 500;
+
+        return res.status(statusCode).json({
             message: 'Failed to delete file',
-            error: 'DELETE_ERROR',
+            error: error.message || 'DELETE_ERROR',
         });
     }
 });

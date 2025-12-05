@@ -67,6 +67,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             data: {
                 id: generateCustomerId(), // Generate custom ID with cust- prefix
                 firstName,
+                lastName,
                 middleName: middleName || null,
                 suffix: suffix || null,
                 phoneNumber,
