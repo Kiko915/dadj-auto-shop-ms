@@ -27,9 +27,9 @@ router.post('/login', async (req, res) => {
 
         // Validate Input
         if (!email || !password) {
-            return res.status(400).json({message: 'Email and Password are required'});
+            return res.status(400).json({ message: 'Email and Password are required' });
         }
-        
+
         // 2. Check user exists in database
         const user = await prisma.user.findUnique({
             where: { email },
@@ -37,13 +37,13 @@ router.post('/login', async (req, res) => {
 
         // Check if the user exist
         if (!user) {
-            return res.status(401).json({message: 'Invalid Email or Password'});
+            return res.status(401).json({ message: 'Invalid Email or Password' });
         }
-        
+
         // 3. Verify password hash
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({message: 'Invalid Email or Password'});
+            return res.status(401).json({ message: 'Invalid Email or Password' });
         }
 
         // 4. Generate JWT token
@@ -57,9 +57,9 @@ router.post('/login', async (req, res) => {
         const userAgent = req.headers['user-agent'] || '';
         const { device, browser } = parseUserAgent(userAgent);
         const ipAddress = getClientIp(req);
-        
+
         console.log('Creating session for user:', user.id, 'Device:', device, 'Browser:', browser);
-        
+
         // First, delete any expired sessions for this user (cleanup)
         const expiredDeleted = await prisma.userSession.deleteMany({
             where: {
@@ -67,9 +67,9 @@ router.post('/login', async (req, res) => {
                 expiresAt: { lt: new Date() }
             }
         });
-        
+
         console.log('Deleted expired sessions:', expiredDeleted.count);
-        
+
         // Create new session
         const newSession = await prisma.userSession.create({
             data: {
@@ -84,7 +84,7 @@ router.post('/login', async (req, res) => {
                 lastActivity: new Date()
             }
         });
-        
+
         console.log('New session created:', newSession.id);
 
         // 5. Return user data and token
@@ -107,8 +107,8 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error' 
+        res.status(500).json({
+            error: 'Internal server error'
         });
     }
 });
@@ -130,19 +130,19 @@ router.post('/logout', async (req, res) => {
         const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
         if (!token) {
-            return res.status(401).json({ 
-                message: 'No token provided' 
+            return res.status(401).json({
+                message: 'No token provided'
             });
         }
 
         // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
+
         console.log('Logout attempt:', {
             userId: decoded.userId,
             token: token.substring(0, 20) + '...'
         });
-        
+
         // Delete the session from database
         const result = await prisma.userSession.deleteMany({
             where: {
@@ -150,32 +150,32 @@ router.post('/logout', async (req, res) => {
                 userId: decoded.userId
             }
         });
-        
+
         console.log('Sessions deleted:', result.count);
-        
+
         res.status(200).json({
             message: 'Logout successful',
             userId: decoded.userId,
             sessionsDeleted: result.count
         });
-        
+
     } catch (error) {
         console.error('Logout error:', error);
-        
+
         if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ 
-                message: 'Invalid token' 
+            return res.status(401).json({
+                message: 'Invalid token'
             });
         }
-        
+
         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ 
-                message: 'Token expired' 
+            return res.status(401).json({
+                message: 'Token expired'
             });
         }
-        
-        res.status(500).json({ 
-            error: 'Internal server error' 
+
+        res.status(500).json({
+            error: 'Internal server error'
         });
     }
 });
@@ -221,6 +221,7 @@ router.post('/forgot-password', async (req, res) => {
         await prisma.passwordReset.create({
             data: {
                 email: user.email,
+                userId: user.id, // Added userId
                 token: resetToken,
                 expiresAt: expiresAt,
                 used: false
@@ -241,7 +242,7 @@ router.post('/forgot-password', async (req, res) => {
 
         // 6. Email content
         const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/reset-password?token=${resetToken}`;
-        
+
         const mailOptions = {
             from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
             to: user.email,
@@ -311,7 +312,7 @@ router.post('/forgot-password', async (req, res) => {
 
     } catch (error) {
         console.error('Forgot password error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: 'Unable to process password reset request'
         });
@@ -374,7 +375,7 @@ router.get('/verify-reset-token', async (req, res) => {
 
     } catch (error) {
         console.error('Token verification error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: 'Unable to verify reset token'
         });
@@ -456,7 +457,7 @@ router.post('/reset-password', async (req, res) => {
         await prisma.$transaction([
             // Update user password
             prisma.user.update({
-                where: { email: resetRecord.email },
+                where: { id: resetRecord.userId }, // Use userId instead of email
                 data: { password: hashedPassword }
             }),
             // Mark token as used
@@ -469,7 +470,7 @@ router.post('/reset-password', async (req, res) => {
         // 8. Clean up expired tokens for this user
         await prisma.passwordReset.deleteMany({
             where: {
-                email: resetRecord.email,
+                userId: resetRecord.userId, // Use userId
                 expiresAt: { lt: new Date() }
             }
         });
@@ -484,7 +485,7 @@ router.post('/reset-password', async (req, res) => {
 
     } catch (error) {
         console.error('Password reset error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: 'Unable to reset password'
         });
@@ -506,15 +507,15 @@ router.post('/register', async (req, res) => {
         // 4. Create user in database
         // 5. Generate JWT token
         // 6. Return user data and token
-        
+
         res.status(501).json({
             message: 'Registration endpoint not implemented yet',
             todo: 'Team member needs to implement user registration logic'
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error' 
+        res.status(500).json({
+            error: 'Internal server error'
         });
     }
 });

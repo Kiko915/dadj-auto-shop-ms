@@ -32,6 +32,7 @@ const emit = defineEmits(['update:open', 'edit', 'delete'])
 const item = ref(null)
 const isLoading = ref(false)
 const error = ref(null)
+const resetTimeout = ref(null)
 
 const fetchVehicleDetails = async () => {
   // If we have a vehicle object passed and no ID (or same ID), we could use it.
@@ -59,24 +60,24 @@ const fetchVehicleDetails = async () => {
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
+    if (resetTimeout.value) {
+      clearTimeout(resetTimeout.value)
+      resetTimeout.value = null
+    }
     fetchVehicleDetails()
   } else {
     // Reset state when closed
-    setTimeout(() => {
+    if (resetTimeout.value) clearTimeout(resetTimeout.value)
+    
+    resetTimeout.value = setTimeout(() => {
       item.value = null
       error.value = null
+      resetTimeout.value = null
     }, 300)
   }
 })
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
+import formatDate from '@/utils/formatDate'
 </script>
 
 <template>

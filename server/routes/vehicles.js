@@ -168,6 +168,16 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             });
         }
 
+        // Delete old image if a new one is being uploaded
+        if (req.body.imageFileId && existingVehicle.imageFileId &&
+            req.body.imageFileId !== existingVehicle.imageFileId) {
+            try {
+                await imagekit.deleteFile(existingVehicle.imageFileId);
+            } catch (imageError) {
+                console.error('Failed to delete old image from ImageKit:', imageError);
+            }
+        }
+
         // Update Vehicle
         const updatedVehicle = await prisma.vehicle.update({
             where: { id },

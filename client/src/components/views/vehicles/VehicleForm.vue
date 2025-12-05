@@ -131,7 +131,6 @@ watch(
       await nextTick()
       
       const v = props.vehicle || {}
-      console.log('VehicleForm opened with vehicle:', v)
 
       // 1. Extract values
       const type = v.vehicleType || v.type || ''

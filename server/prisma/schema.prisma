@@ -46,13 +46,14 @@ model User {
 model PasswordReset {
   id        String   @id @default(cuid())
   email     String
+  userId    String
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
 
   // Relations
-  user User @relation(fields: [email], references: [email])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_resets")
 }

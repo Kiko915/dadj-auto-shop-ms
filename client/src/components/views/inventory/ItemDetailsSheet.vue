@@ -72,16 +72,7 @@ const formatMoney = (amount) => {
   }).format(amount)
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+import formatDate from '@/utils/formatDate'
 const copied = ref(false)
 const copySku = async () => {
   if (item.value?.sku) {

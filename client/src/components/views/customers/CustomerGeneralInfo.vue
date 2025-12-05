@@ -41,13 +41,7 @@ const formattedBirthday = computed(() => {
   }).format(new Date(props.customer.birthday))
 })
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+import formatDate from '@/utils/formatDate'
 </script>
 
 <template>
