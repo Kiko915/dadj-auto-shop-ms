@@ -4,6 +4,7 @@ import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import prisma from '../db.js';
 import { generateVehicleId } from '../utils/generateId.js';
+import imagekit from '../config/imagekit.js';
 
 const router = express.Router();
 
@@ -78,7 +79,7 @@ router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
 router.post('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { customerId } = req.params;
-        const { licensePlate, make, model, year, vin, mileage, vehicleType, notes } = req.body;
+        const { licensePlate, make, model, year, vin, mileage, vehicleType, color, notes } = req.body;
 
         // Input Validation
         if (!licensePlate || !make || !model) {
@@ -100,7 +101,10 @@ router.post('/customer/:customerId', authenticateToken, authorizeRoles(['staff',
                 vin: vin || null,
                 mileage: mileage ? Number(mileage) : null,
                 vehicleType: vehicleType || null,
+                color: color || null,
                 notes: notes || null,
+                imageUrl: req.body.imageUrl || null,
+                imageFileId: req.body.imageFileId || null,
             },
         });
 
@@ -110,6 +114,22 @@ router.post('/customer/:customerId', authenticateToken, authorizeRoles(['staff',
         });
     } catch (error) {
         console.error('Create Vehicle Error:', error);
+
+        if (error.code === 'P2002') {
+            if (error.meta?.target?.includes('license_plate')) {
+                return res.status(409).json({
+                    message: 'A vehicle with this license plate already exists',
+                    error: 'DUPLICATE_LICENSE_PLATE',
+                });
+            }
+            if (error.meta?.target?.includes('vin')) {
+                return res.status(409).json({
+                    message: 'A vehicle with this VIN already exists',
+                    error: 'DUPLICATE_VIN',
+                });
+            }
+        }
+
         return res.status(500).json({
             message: 'Failed to create vehicle',
             error: 'VEHICLE_ERROR',
@@ -129,7 +149,7 @@ router.post('/customer/:customerId', authenticateToken, authorizeRoles(['staff',
 router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.params;
-        const { licensePlate, make, model, year, vin, mileage, vehicleType, notes } = req.body;
+        const { licensePlate, make, model, year, vin, mileage, vehicleType, color, notes } = req.body;
 
         // Input Validation
         if (!licensePlate || !make || !model) {
@@ -159,7 +179,10 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 vin: vin || null,
                 mileage: mileage ? Number(mileage) : null,
                 vehicleType: vehicleType || null,
+                color: color || null,
                 notes: notes || null,
+                imageUrl: req.body.imageUrl || null,
+                imageFileId: req.body.imageFileId || null,
             },
         });
 
@@ -169,6 +192,21 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
         });
     } catch (error) {
         console.error('Update Vehicle Error:', error);
+        if (error.code === 'P2002') {
+            if (error.meta?.target?.includes('license_plate')) {
+                return res.status(409).json({
+                    message: 'A vehicle with this license plate already exists',
+                    error: 'DUPLICATE_LICENSE_PLATE',
+                });
+            }
+            if (error.meta?.target?.includes('vin')) {
+                return res.status(409).json({
+                    message: 'A vehicle with this VIN already exists',
+                    error: 'DUPLICATE_VIN',
+                });
+            }
+        }
+
         return res.status(500).json({
             message: 'Failed to update vehicle',
             error: 'VEHICLE_ERROR',
@@ -195,6 +233,16 @@ router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), asy
                 message: 'Vehicle not found',
                 error: 'NOT_FOUND',
             });
+        }
+
+        // Delete image from ImageKit if exists
+        if (vehicle.imageFileId) {
+            try {
+                await imagekit.deleteFile(vehicle.imageFileId);
+            } catch (imageError) {
+                console.error('Failed to delete image from ImageKit:', imageError);
+                // Continue with vehicle deletion even if image deletion fails
+            }
         }
 
         await prisma.vehicle.delete({

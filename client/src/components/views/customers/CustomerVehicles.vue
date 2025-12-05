@@ -2,7 +2,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Car, Plus, Info } from 'lucide-vue-next'
+import { Car, Plus, Info, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-vue-next'
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type Vehicle = {
   id: string
@@ -22,6 +30,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   addVehicle: []
+  viewVehicle: [vehicle: Vehicle]
+  editVehicle: [vehicle: Vehicle]
+  deleteVehicle: [vehicle: Vehicle]
 }>()
 </script>
 
@@ -89,7 +100,30 @@ const emit = defineEmits<{
                 <td class="px-4 py-3">{{ vehicle.vehicleType || 'N/A' }}</td>
                 <td class="px-4 py-3">{{ vehicle.mileage ? `${vehicle.mileage.toLocaleString()} km` : 'N/A' }}</td>
                 <td class="px-4 py-3 text-right">
-                  <Button variant="ghost" size="sm">View Details</Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" class="h-8 w-8 p-0">
+                        <span class="sr-only">Open menu</span>
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem @click="emit('viewVehicle', vehicle)">
+                        <Eye class="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem @click="emit('editVehicle', vehicle)">
+                        <Edit class="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem @click="emit('deleteVehicle', vehicle)" class="text-destructive">
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
             </tbody>

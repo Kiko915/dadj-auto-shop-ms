@@ -3,13 +3,21 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getCustomer } from '@/api/customers'
-import { getCustomerVehicles } from '@/api/vehicles'
+import { getCustomerVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/api/vehicles'
 import { getCustomerServiceOrders } from '@/api/serviceOrders'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { ArrowLeft, User, Car, History } from 'lucide-vue-next'
+import { ArrowLeft, User, Car, History, AlertTriangle } from 'lucide-vue-next'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 // Component imports
 import CustomerHeader from '@/components/views/customers/CustomerHeader.vue'
@@ -17,6 +25,8 @@ import CustomerGeneralInfo from '@/components/views/customers/CustomerGeneralInf
 import CustomerVehicles from '@/components/views/customers/CustomerVehicles.vue'
 import CustomerServiceHistory from '@/components/views/customers/CustomerServiceHistory.vue'
 import EditCustomerModal from '@/components/views/customers/EditCustomerModal.vue'
+import VehicleForm from '@/components/views/vehicles/VehicleForm.vue'
+import VehicleDetailsSheet from '@/components/views/vehicles/VehicleDetailsSheet.vue'
 
 // Types
 type Customer = {
@@ -153,8 +163,92 @@ const handleStartServiceOrder = () => {
   router.push(`/dashboard/service-orders/new?customerId=${customerId.value}`)
 }
 
+
+const isAddVehicleModalOpen = ref(false)
+const isVehicleDetailsSheetOpen = ref(false)
+const isDeleteVehicleModalOpen = ref(false)
+const isSavingVehicle = ref(false)
+const isDeletingVehicle = ref(false)
+const selectedVehicle = ref<any>(null)
+const vehicleFormMode = ref<'create' | 'edit'>('create')
+
 const handleAddVehicle = () => {
-  router.push(`/dashboard/customers/${customerId.value}/vehicles/new`)
+  selectedVehicle.value = null
+  vehicleFormMode.value = 'create'
+  isAddVehicleModalOpen.value = true
+}
+
+const handleViewVehicle = (vehicle: any) => {
+  selectedVehicle.value = vehicle
+  isVehicleDetailsSheetOpen.value = true
+}
+
+const handleEditVehicle = (vehicle: any) => {
+  selectedVehicle.value = vehicle
+  vehicleFormMode.value = 'edit'
+  isAddVehicleModalOpen.value = true
+  isVehicleDetailsSheetOpen.value = false // Close sheet if open
+}
+
+const handleDeleteVehicle = (vehicle: any) => {
+  selectedVehicle.value = vehicle
+  isDeleteVehicleModalOpen.value = true
+}
+
+const confirmDeleteVehicle = async () => {
+  if (!selectedVehicle.value) return
+  
+  try {
+    isDeletingVehicle.value = true
+    await deleteVehicle(selectedVehicle.value.id)
+    toast.success('Vehicle deleted successfully')
+    await fetchCustomerData()
+    isDeleteVehicleModalOpen.value = false
+    isVehicleDetailsSheetOpen.value = false // Close sheet if open
+  } catch (error) {
+    console.error('Failed to delete vehicle:', error)
+    toast.error('Failed to delete vehicle')
+  } finally {
+    isDeletingVehicle.value = false
+  }
+}
+
+const handleVehicleSaved = async (vehicleData: any) => {
+  try {
+    isSavingVehicle.value = true
+    // Ensure customerId is set
+    vehicleData.customerId = customerId.value
+    
+    if (vehicleFormMode.value === 'create') {
+      await createVehicle(vehicleData)
+      toast.success('Vehicle added successfully')
+    } else {
+      if (selectedVehicle.value?.id) {
+        await updateVehicle(selectedVehicle.value.id, vehicleData)
+        toast.success('Vehicle updated successfully')
+      }
+    }
+    
+    isAddVehicleModalOpen.value = false
+    
+    // Refresh data
+    await fetchCustomerData()
+  } catch (error: any) {
+    console.error('Failed to save vehicle:', error)
+    if (error.response?.status === 409) {
+      if (error.response?.data?.error === 'DUPLICATE_LICENSE_PLATE') {
+        toast.error('A vehicle with this license plate already exists')
+      } else if (error.response?.data?.error === 'DUPLICATE_VIN') {
+        toast.error('A vehicle with this VIN already exists')
+      } else {
+        toast.error('A vehicle with this information already exists')
+      }
+    } else {
+      toast.error(vehicleFormMode.value === 'create' ? 'Failed to add vehicle' : 'Failed to update vehicle')
+    }
+  } finally {
+    isSavingVehicle.value = false
+  }
 }
 
 const handleViewReceipt = (serviceId: string) => {
@@ -237,6 +331,9 @@ onMounted(() => {
             :show-notice="showVehicleNotice"
             :customer-full-name="fullName"
             @add-vehicle="handleAddVehicle"
+            @view-vehicle="handleViewVehicle"
+            @edit-vehicle="handleEditVehicle"
+            @delete-vehicle="handleDeleteVehicle"
           />
         </TabsContent>
 
@@ -263,5 +360,52 @@ onMounted(() => {
       :customer="customer"
       @customer-updated="handleCustomerUpdated"
     />
+
+    <!-- Add/Edit Vehicle Modal -->
+    <VehicleForm
+      v-model:open="isAddVehicleModalOpen"
+      :mode="vehicleFormMode"
+      :vehicle="selectedVehicle || { customerId: customerId }"
+      :loading="isSavingVehicle"
+      @save="handleVehicleSaved"
+      @cancel="isAddVehicleModalOpen = false"
+    />
+
+    <!-- Vehicle Details Sheet -->
+    <VehicleDetailsSheet
+      v-model:open="isVehicleDetailsSheetOpen"
+      :vehicle="selectedVehicle"
+      @edit="handleEditVehicle"
+      @delete="handleDeleteVehicle"
+    />
+
+    <!-- Delete Confirmation Dialog -->
+    <Dialog v-model:open="isDeleteVehicleModalOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2 text-destructive">
+            <AlertTriangle class="h-5 w-5" />
+            Delete Vehicle
+          </DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete this vehicle? This action cannot be undone and will remove all associated service history.
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="selectedVehicle" class="py-4">
+          <div class="rounded-md bg-muted p-3">
+            <div class="font-medium">{{ selectedVehicle.make }} {{ selectedVehicle.model }}</div>
+            <div class="text-sm text-muted-foreground">License Plate: {{ selectedVehicle.licensePlate }}</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="isDeleteVehicleModalOpen = false" :disabled="isDeletingVehicle">
+            Cancel
+          </Button>
+          <Button variant="destructive" @click="confirmDeleteVehicle" :disabled="isDeletingVehicle">
+            {{ isDeletingVehicle ? 'Deleting...' : 'Delete Vehicle' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

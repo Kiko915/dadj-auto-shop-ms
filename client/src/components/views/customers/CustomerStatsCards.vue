@@ -13,36 +13,42 @@ defineProps<Props>()
 
 <template>
   <div class="grid gap-4 md:grid-cols-3">
-    <Card>
+    <Card class="relative overflow-hidden bg-gradient-to-br from-blue-50 to-white border-blue-100 transition-all hover:shadow-md">
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Total Customers</CardTitle>
-        <Users class="h-4 w-4 text-muted-foreground" />
+        <CardTitle class="text-sm font-medium text-blue-900">Total Customers</CardTitle>
+        <div class="p-2 bg-blue-100/50 rounded-lg">
+          <Users class="h-4 w-4 text-blue-600" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div class="text-2xl font-bold">{{ totalCustomers }}</div>
-        <p class="text-xs text-muted-foreground">All registered customers</p>
+        <div class="text-2xl font-bold text-blue-700">{{ totalCustomers }}</div>
+        <p class="text-xs text-blue-600/80">All registered customers</p>
       </CardContent>
     </Card>
 
-    <Card>
+    <Card class="relative overflow-hidden bg-gradient-to-br from-amber-50 to-white border-amber-100 transition-all hover:shadow-md">
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Loyal Customers</CardTitle>
-        <Star class="h-4 w-4 text-amber-500" />
+        <CardTitle class="text-sm font-medium text-amber-900">Loyal Customers</CardTitle>
+        <div class="p-2 bg-amber-100/50 rounded-lg">
+          <Star class="h-4 w-4 text-amber-600" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div class="text-2xl font-bold text-amber-500">{{ loyalCustomers }}</div>
-        <p class="text-xs text-muted-foreground">Premium tier members</p>
+        <div class="text-2xl font-bold text-amber-700">{{ loyalCustomers }}</div>
+        <p class="text-xs text-amber-600/80">Premium tier members</p>
       </CardContent>
     </Card>
 
-    <Card>
+    <Card class="relative overflow-hidden bg-gradient-to-br from-green-50 to-white border-green-100 transition-all hover:shadow-md">
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Total Vehicles</CardTitle>
-        <Car class="h-4 w-4 text-muted-foreground" />
+        <CardTitle class="text-sm font-medium text-green-900">Total Vehicles</CardTitle>
+        <div class="p-2 bg-green-100/50 rounded-lg">
+          <Car class="h-4 w-4 text-green-600" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div class="text-2xl font-bold">{{ totalVehicles }}</div>
-        <p class="text-xs text-muted-foreground">Across all customers</p>
+        <div class="text-2xl font-bold text-green-700">{{ totalVehicles }}</div>
+        <p class="text-xs text-green-600/80">Across all customers</p>
       </CardContent>
     </Card>
   </div>

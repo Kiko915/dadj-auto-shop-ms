@@ -13,6 +13,14 @@ const props = defineProps({
   label: {
     type: String,
     default: 'Product Image'
+  },
+  folder: {
+    type: String,
+    default: '/inventory'
+  },
+  fileNamePrefix: {
+    type: String,
+    default: 'product'
   }
 })
 
@@ -81,8 +89,11 @@ const uploadToImageKit = async (file) => {
 
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('fileName', `product_${Date.now()}_${file.name}`)
-    formData.append('folder', '/inventory')
+    formData.append('fileName', `${props.fileNamePrefix}_${Date.now()}_${file.name}`)
+    
+    const targetFolder = props.folder || '/inventory'
+    
+    formData.append('folder', targetFolder)
     formData.append('token', token)
     formData.append('expire', expire)
     formData.append('signature', signature)
@@ -108,7 +119,7 @@ const uploadToImageKit = async (file) => {
     emit('update:fileId', uploadData.fileId)
 
     toast.success('Image Uploaded', {
-      description: 'Product image uploaded successfully'
+      description: `${props.label} uploaded successfully`
     })
   } catch (error) {
     console.error('Upload error:', error)
