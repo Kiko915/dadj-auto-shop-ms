@@ -228,7 +228,9 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
         }
 
         // Delete old profile picture if a new one is being uploaded
-        if (imageFileId && existingCustomer.imageFileId && imageFileId !== existingCustomer.imageFileId) {
+        // Delete old profile picture if a new one is being uploaded or removed
+        // Condition: existing file exists AND (field is being updated AND update value is different)
+        if (existingCustomer.imageFileId && imageFileId !== undefined && imageFileId !== existingCustomer.imageFileId) {
             try {
                 await imagekit.deleteFile(existingCustomer.imageFileId);
                 console.log(`Deleted old profile picture: ${existingCustomer.imageFileId}`);
