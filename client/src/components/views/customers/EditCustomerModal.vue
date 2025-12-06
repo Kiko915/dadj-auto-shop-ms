@@ -10,7 +10,9 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Loader2 } from 'lucide-vue-next'
-import { updateCustomer } from '@/api/customers'
+import { getCustomer, updateCustomer } from '@/api/customers'
+import api from '@/api'
+import ImageUpload from '@/components/common/ImageUpload.vue'
 
 type Customer = {
   id: string
@@ -23,6 +25,8 @@ type Customer = {
   birthday?: string | null
   loyaltyStatus: string
   notes?: string | null
+  profilePicture?: string | null
+  imageFileId?: string | null
 }
 
 const props = defineProps<{
@@ -36,6 +40,7 @@ const emit = defineEmits<{
 }>()
 
 const isSubmitting = ref(false)
+const isUploadingImage = ref(false)
 const editForm = ref({
   firstName: '',
   lastName: '',
@@ -46,6 +51,8 @@ const editForm = ref({
   birthday: null as Date | null,
   loyaltyStatus: 'Regular' as 'Loyal' | 'Regular' | 'VIP',
   notes: '',
+  profilePicture: '' as string | null,
+  imageFileId: '' as string | null,
 })
 
 // Helper function to capitalize first letter
@@ -67,12 +74,32 @@ watch(() => props.customer, (newCustomer) => {
       birthday: newCustomer.birthday ? new Date(newCustomer.birthday) : null,
       loyaltyStatus: capitalizeFirst(newCustomer.loyaltyStatus) as 'Loyal' | 'Regular' | 'VIP',
       notes: newCustomer.notes || '',
+      profilePicture: newCustomer.profilePicture || '',
+      imageFileId: newCustomer.imageFileId || '',
     }
   }
 }, { immediate: true })
 
+// Watch for image changes to cleanup orphaned files
+watch(() => editForm.value.imageFileId, async (newVal, oldVal) => {
+  // If we have an old temporary file that is DIFFERENT from the original customer image
+  // AND different from the new one, it means it was an intermediate upload we should delete.
+  if (oldVal && newVal !== oldVal && props.customer && oldVal !== props.customer.imageFileId) {
+    try {
+      console.log('Cleaning up orphaned file:', oldVal)
+      await api.delete(`/files/${oldVal}`)
+    } catch (error) {
+      console.error('Failed to cleanup orphaned file:', error)
+    }
+  }
+})
+
 const handleUpdateCustomer = async () => {
   if (!props.customer) return
+  if (isUploadingImage.value) {
+    toast.error('Please wait for the image upload to complete')
+    return
+  }
   
   try {
     isSubmitting.value = true
@@ -96,6 +123,8 @@ const handleUpdateCustomer = async () => {
       birthday: editForm.value.birthday ? formatDateLocal(editForm.value.birthday) : null,
       loyaltyStatus: editForm.value.loyaltyStatus,
       notes: editForm.value.notes || '',
+      profilePicture: editForm.value.profilePicture || null,
+      imageFileId: editForm.value.imageFileId || null,
     }
     
     await updateCustomer(props.customer.id, updateData)
@@ -117,7 +146,7 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="(value) => emit('update:open', value)">
+  <Dialog :open="open" @update:open="(value) => !isSubmitting && emit('update:open', value)">
     <DialogContent class="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Edit Customer Profile</DialogTitle>
@@ -130,6 +159,18 @@ const handleCancel = () => {
         <!-- Personal Information Section -->
         <div class="space-y-4">
           <h3 class="text-sm font-semibold">Personal Information</h3>
+          
+          <div class="flex justify-center mb-6">
+            <ImageUpload
+              v-model="editForm.profilePicture"
+              :label="'Profile Picture'"
+              folder="/customer-profiles"
+              fileNamePrefix="customer"
+              @update:fileId="(val) => editForm.imageFileId = val"
+              @upload-start="isUploadingImage = true"
+              @upload-end="isUploadingImage = false"
+            />
+          </div>
           
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
@@ -266,10 +307,10 @@ const handleCancel = () => {
         </Button>
         <Button
           @click="handleUpdateCustomer"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || isUploadingImage"
         >
-          <Loader2 v-if="isSubmitting" class="h-4 w-4 mr-2 animate-spin" />
-          {{ isSubmitting ? 'Updating...' : 'Update Customer' }}
+          <Loader2 v-if="isSubmitting || isUploadingImage" class="h-4 w-4 mr-2 animate-spin" />
+          {{ isSubmitting ? 'Updating...' : (isUploadingImage ? 'Uploading Image...' : 'Update Customer') }}
         </Button>
       </DialogFooter>
     </DialogContent>

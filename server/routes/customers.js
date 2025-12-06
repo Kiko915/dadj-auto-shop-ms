@@ -4,6 +4,7 @@ import express from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import prisma from '../db.js';
 import { generateCustomerId } from '../utils/generateId.js';
+import imagekit from '../config/imagekit.js';
 
 const router = express.Router();
 
@@ -29,18 +30,19 @@ const router = express.Router();
  */
 router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { 
-            firstName, 
-            lastName, 
-            middleName, 
-            suffix, 
-            phoneNumber, 
+        const {
+            firstName,
+            lastName,
+            middleName,
+            suffix,
+            phoneNumber,
             email,
             birthday,
             profilePicture,
-            notes, 
+            notes,
             loyaltyStatus,
-            totalVehicles 
+            totalVehicles,
+            imageFileId
         } = req.body;
 
         // Input Validation
@@ -72,6 +74,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 email,
                 birthday: birthday ? new Date(birthday) : null,
                 profilePicture: profilePicture || null,
+                imageFileId: imageFileId || null,
                 notes: notes || null,
                 loyaltyStatus: loyaltyStatus ? loyaltyStatus.toLowerCase() : 'regular',
                 totalVehicles: totalVehicles ? parseInt(totalVehicles) : 0,
@@ -82,6 +85,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             message: 'Customer added successfully',
             customer: newCustomer,
         });
+
     } catch (error) {
         console.error('Add Customer Error:', error);
 
@@ -108,8 +112,22 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
  */
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const customers = await prisma.customer.findMany({
+        const customersData = await prisma.customer.findMany({
             orderBy: { lastModified: 'desc' },
+            include: {
+                _count: {
+                    select: { vehicles: true }
+                }
+            }
+        });
+
+        const customers = customersData.map(customer => {
+            const customerWithCount = {
+                ...customer,
+                totalVehicles: customer._count.vehicles
+            };
+            delete customerWithCount._count;
+            return customerWithCount;
         });
 
         return res.status(200).json({
@@ -137,13 +155,25 @@ router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
     try {
         const { id } = req.params;
 
-        const customer = await prisma.customer.findUnique({ where: { id } });
+        const customer = await prisma.customer.findUnique({
+            where: { id },
+            include: {
+                _count: {
+                    select: { vehicles: true }
+                }
+            }
+        });
+
         if (!customer) {
             return res.status(404).json({
                 message: 'Customer not found',
                 error: 'NOT_FOUND',
             });
         }
+
+        // Map the dynamic count to totalVehicles to ensure accuracy
+        customer.totalVehicles = customer._count.vehicles;
+        delete customer._count;
 
         return res.status(200).json({
             message: 'Customer retrieved successfully',
@@ -184,6 +214,8 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             serviceCount,
             totalSpent,
             birthday,
+            profilePicture,
+            imageFileId,
         } = req.body;
 
         // Check if the customer exists
@@ -193,6 +225,18 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 message: 'Customer not found',
                 error: 'NOT_FOUND',
             });
+        }
+
+        // Delete old profile picture if a new one is being uploaded
+        // Delete old profile picture if a new one is being uploaded or removed
+        // Condition: existing file exists AND (field is being updated AND update value is different)
+        if (existingCustomer.imageFileId && imageFileId !== undefined && imageFileId !== existingCustomer.imageFileId) {
+            try {
+                await imagekit.deleteFile(existingCustomer.imageFileId);
+                console.log(`Deleted old profile picture: ${existingCustomer.imageFileId}`);
+            } catch (imageError) {
+                console.error('Failed to delete old profile picture from ImageKit:', imageError);
+            }
         }
 
         // Update Customer
@@ -211,6 +255,8 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 ...(typeof serviceCount === 'number' && { serviceCount }),
                 ...(typeof totalSpent === 'number' && { totalSpent }),
                 ...(birthday !== undefined && { birthday: birthday ? new Date(birthday) : null }),
+                ...(profilePicture !== undefined && { profilePicture: profilePicture || null }),
+                ...(imageFileId !== undefined && { imageFileId: imageFileId || null }),
             },
         });
 
