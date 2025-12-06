@@ -9,6 +9,43 @@ import imagekit from '../config/imagekit.js';
 const router = express.Router();
 
 /**
+ * @route GET /api/vehicles
+ * @desc Get all vehicles in the system
+ * @access Staff, Admin
+ * @returns {200} { message: string, vehicles: Array } - Successfully retrieved list of vehicles
+ * @returns {500} { message: string, error: string } - Failed to retrieve vehicles
+ */
+router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const vehicles = await prisma.vehicle.findMany({
+            include: {
+                customer: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        phoneNumber: true
+                    }
+                }
+            },
+            orderBy: {
+                dateRegistered: 'desc'
+            }
+        });
+
+        return res.status(200).json({
+            message: 'All vehicles retrieved successfully',
+            vehicles,
+        });
+    } catch (error) {
+        console.error('Get All Vehicles Error:', error);
+        return res.status(500).json({
+            message: 'Failed to retrieve vehicles',
+            error: 'VEHICLE_ERROR',
+        });
+    }
+});
+
+/**
  * @route GET /api/vehicles/customer/:customerId
  * @desc Get all vehicles belonging to a specific customer
  * @access Staff, Admin
