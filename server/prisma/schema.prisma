@@ -184,6 +184,12 @@ enum PaymentMethod {
   OTHER
 }
 
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
 enum ItemType {
   PART
   LABOR
@@ -217,6 +223,8 @@ model Estimate {
   updatedAt  DateTime  @updatedAt @map("updated_at")
   expiryDate DateTime? @map("expiry_date") // Optional: Quote valid until...
 
+  @@index([customerId])
+  @@index([vehicleId])
   @@map("estimates")
 }
 
@@ -256,9 +264,9 @@ model ServiceOrder {
   totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
 
   // Installment / Debt Tracking
-  amountPaid    Decimal @default(0) @map("amount_paid") @db.Decimal(10, 2)
-  balance       Decimal @default(0) @db.Decimal(10, 2) // Calculated as (totalAmount - amountPaid)
-  paymentStatus String  @default("UNPAID") @map("payment_status") // UNPAID, PARTIAL, PAID
+  amountPaid    Decimal       @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  balance       Decimal       @default(0) @db.Decimal(10, 2) // Calculated as (totalAmount - amountPaid)
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status") // UNPAID, PARTIAL, PAID
 
   // Relations
   customerId String   @map("customer_id")
@@ -279,6 +287,8 @@ model ServiceOrder {
   updatedAt           DateTime  @updatedAt @map("updated_at")
   estimatedCompletion DateTime? @map("estimated_completion")
 
+  @@index([customerId])
+  @@index([vehicleId])
   @@map("service_orders")
 }
 
