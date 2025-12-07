@@ -112,7 +112,20 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
  */
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
+        const { search } = req.query;
+
+        const where = {};
+        if (search) {
+            where.OR = [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+                { phoneNumber: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
         const customersData = await prisma.customer.findMany({
+            where,
             orderBy: { lastModified: 'desc' },
             include: {
                 _count: {

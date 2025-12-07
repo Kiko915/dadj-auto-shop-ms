@@ -134,7 +134,6 @@ const navigationItems = [
                 title: 'New Estimate',
                 url: '/dashboard/estimates/new',
                 description: 'Create a quote for approval',
-                comingSoon: true
             },
             {
                 title: 'Pending Approval',

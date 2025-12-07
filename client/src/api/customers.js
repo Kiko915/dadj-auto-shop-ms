@@ -3,11 +3,12 @@ import api from './index'
 
 /**
  * Get all customers
+ * @param {Object} [params] - Query parameters (search, etc.)
  * @returns {Promise} Response with customers array
  */
-export const getCustomers = async () => {
+export const getCustomers = async (params = {}) => {
   try {
-    const response = await api.get('/customers')
+    const response = await api.get('/customers', { params })
     return response.data
   } catch (error) {
     throw error
@@ -88,10 +89,8 @@ export const deleteCustomer = async (id) => {
  */
 export const searchCustomers = async (query) => {
   try {
-    const response = await api.get('/customers/search', {
-      params: { q: query }
-    })
-    return response.data
+    const data = await getCustomers({ search: query })
+    return data.customers || []
   } catch (error) {
     throw error
   }
