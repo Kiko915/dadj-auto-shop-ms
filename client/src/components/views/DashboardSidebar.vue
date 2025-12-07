@@ -123,22 +123,44 @@ const navigationItems = [
       },
     ],
   },
-   {
-    title: 'Service Order',
+  {
+    title: 'Service Operations',
     items: [
       {
-        title: 'New Service Order',
+        title: 'Estimates',
         icon: FileText,
-        url: '/dashboard/service-orders/new',
-        description: 'Start Transaction/Financial process',
-        comingSoon: true
+        children: [
+            {
+                title: 'New Estimate',
+                url: '/dashboard/estimates/new',
+                description: 'Create a quote for approval',
+                comingSoon: true
+            },
+            {
+                title: 'Pending Approval',
+                url: '/dashboard/estimates',
+                description: 'Quotes waiting for customer approval',
+                comingSoon: true
+            }
+        ]
       },
       {
-        title: 'Service History',
-        icon: ClipboardList,
-        url: '/dashboard/service-history',
-        description: 'Track past services',
-        comingSoon: true
+        title: 'Service Orders',
+        icon: Wrench,
+        children: [
+          {
+            title: 'Job Board',
+            url: '/dashboard/service-orders',
+            description: 'Active repairs & status board',
+            comingSoon: true
+          },
+          {
+            title: 'Service History',
+            url: '/dashboard/service-history',
+            description: 'Completed vehicle history',
+            comingSoon: true
+          },
+        ]
       },
       {
         title: 'Billing & Invoicing',
@@ -147,13 +169,7 @@ const navigationItems = [
         description: 'Invoices and payments',
         comingSoon: true
       },
-      {
-        title: 'Mechanic Assignment',
-        icon: Wrench,
-        url: '/dashboard/mechanics',
-        description: 'Assign mechanics to jobs',
-        comingSoon: true
-      },
+
     ],
   },
 ]
