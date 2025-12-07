@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getCustomer } from '@/api/customers'
@@ -321,6 +322,13 @@ const goBack = () => {
 
 onMounted(() => {
   fetchCustomerData()
+})
+
+onBeforeUnmount(() => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+    searchTimeout = undefined
+  }
 })
 </script>
 

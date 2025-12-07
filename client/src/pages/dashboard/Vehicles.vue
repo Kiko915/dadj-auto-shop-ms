@@ -63,9 +63,10 @@ const totalPages = ref(1)
 
 // Watch search query for debounce
 watch(searchQuery, (newValue) => {
+  debouncedSearchQuery.value = newValue // Update immediately so other filters see it
+  
   if (debounceTimeout) clearTimeout(debounceTimeout)
   debounceTimeout = setTimeout(() => {
-    debouncedSearchQuery.value = newValue
     currentPage.value = 1 // Reset to first page on search
     fetchVehicles()
   }, 300)
