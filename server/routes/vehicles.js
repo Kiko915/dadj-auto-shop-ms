@@ -15,26 +15,83 @@ const router = express.Router();
  * @returns {200} { message: string, vehicles: Array } - Successfully retrieved list of vehicles
  * @returns {500} { message: string, error: string } - Failed to retrieve vehicles
  */
+// server/routes/vehicles.js
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const vehicles = await prisma.vehicle.findMany({
-            include: {
-                customer: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        phoneNumber: true
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const search = req.query.search || '';
+        const make = req.query.make || 'All';
+
+        const skip = (page - 1) * pageSize;
+
+        // Build Where Clause
+        const where = {};
+
+        if (make !== 'All') {
+            where.make = make;
+        }
+
+        if (search) {
+            where.OR = [
+                { licensePlate: { contains: search, mode: 'insensitive' } },
+                { make: { contains: search, mode: 'insensitive' } },
+                { model: { contains: search, mode: 'insensitive' } },
+                {
+                    customer: {
+                        OR: [
+                            { firstName: { contains: search, mode: 'insensitive' } },
+                            { lastName: { contains: search, mode: 'insensitive' } }
+                        ]
                     }
                 }
-            },
-            orderBy: {
-                dateRegistered: 'desc'
-            }
-        });
+            ];
+        }
+
+        // Parallel execution for count and data
+        const [total, vehicles] = await Promise.all([
+            prisma.vehicle.count({ where }),
+            prisma.vehicle.findMany({
+                where,
+                skip,
+                take: pageSize,
+                // Select only necessary fields for the list view
+                select: {
+                    id: true,
+                    licensePlate: true,
+                    make: true,
+                    model: true,
+                    year: true,
+                    mileage: true,
+                    dateRegistered: true,
+                    imageUrl: true,
+                    vehicleType: true,
+                    customerId: true, // Needed for owner link
+                    customer: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            phoneNumber: true
+                        }
+                    }
+                },
+                orderBy: {
+                    dateRegistered: 'desc'
+                }
+            })
+        ]);
+
+        const totalPages = Math.ceil(total / pageSize);
 
         return res.status(200).json({
             message: 'All vehicles retrieved successfully',
             vehicles,
+            meta: {
+                total,
+                page,
+                pageSize,
+                totalPages
+            }
         });
     } catch (error) {
         console.error('Get All Vehicles Error:', error);
@@ -55,13 +112,56 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
 router.get('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { customerId } = req.params;
-        const vehicles = await prisma.vehicle.findMany({
-            where: { customerId },
-        });
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const search = req.query.search || '';
+        const make = req.query.make || 'All';
+        const sortBy = req.query.sortBy || 'dateRegistered';
+        const sortOrder = req.query.sortOrder || 'desc';
+        const skip = (page - 1) * pageSize;
+
+        // Build Where Clause
+        const where = { customerId };
+
+        if (make !== 'All') {
+            where.make = make;
+        }
+
+        if (search) {
+            where.OR = [
+                { licensePlate: { contains: search, mode: 'insensitive' } },
+                { make: { contains: search, mode: 'insensitive' } },
+                { model: { contains: search, mode: 'insensitive' } },
+                { vin: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        const [total, vehicles, uniqueMakesData] = await Promise.all([
+            prisma.vehicle.count({ where }),
+            prisma.vehicle.findMany({
+                where,
+                skip,
+                take: pageSize,
+                orderBy: { [sortBy]: sortOrder }
+            }),
+            prisma.vehicle.findMany({
+                where: { customerId },
+                select: { make: true },
+                distinct: ['make']
+            })
+        ]);
+
+        const totalPages = Math.ceil(total / pageSize);
 
         return res.status(200).json({
             message: 'Vehicles retrieved successfully',
             vehicles,
+            meta: {
+                total,
+                page,
+                pageSize,
+                totalPages
+            }
         });
     } catch (error) {
         console.error('Get Vehicles Error:', error);

@@ -5,7 +5,7 @@ import DashboardNavbar from './DashboardNavbar.vue'
 </script>
 
 <template>
-  <SidebarProvider>
+  <SidebarProvider width="md">
     <DashboardSidebar />
     <SidebarInset class="flex flex-col">
       <div class="sticky top-0 z-10 bg-background">

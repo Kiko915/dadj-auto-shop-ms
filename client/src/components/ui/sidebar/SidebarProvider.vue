@@ -10,9 +10,11 @@ const props = withDefaults(defineProps<{
   defaultOpen?: boolean
   open?: boolean
   class?: HTMLAttributes["class"]
+  width?: string
 }>(), {
   defaultOpen: !defaultDocument?.cookie.includes(`${SIDEBAR_COOKIE_NAME}=false`),
   open: undefined,
+  width: SIDEBAR_WIDTH,
 })
 
 const emits = defineEmits<{
@@ -63,6 +65,16 @@ provideSidebarContext({
   setOpenMobile,
   toggleSidebar,
 })
+
+const sidebarWidth = computed(() => {
+    switch (props.width) {
+        case 'sm': return '14rem'
+        case 'md': return '18rem'
+        case 'lg': return '20rem'
+        case 'xl': return '24rem'
+        default: return props.width || SIDEBAR_WIDTH
+    }
+})
 </script>
 
 <template>
@@ -70,7 +82,7 @@ provideSidebarContext({
     <div
       data-slot="sidebar-wrapper"
       :style="{
-        '--sidebar-width': SIDEBAR_WIDTH,
+        '--sidebar-width': sidebarWidth,
         '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
       }"
       :class="cn('group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full', props.class)"

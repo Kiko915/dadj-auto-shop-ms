@@ -349,7 +349,7 @@ const handleLogin = async () => {
               Account Creation
             </AlertTitle>
             <AlertDescription class="text-sm text-[#737373]">
-              Please contact the administrator to be able to be added as a Staff member.
+              Please contact the administrator to be added as a Staff member.
             </AlertDescription>
           </Alert>
         </form>
