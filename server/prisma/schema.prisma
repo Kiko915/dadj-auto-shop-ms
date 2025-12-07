@@ -97,9 +97,11 @@ model Customer {
   serviceCount   Int       @default(0) @map("service_count")
   totalSpent     Decimal   @default(0) @map("total_spent") @db.Decimal(10, 2)
 
-  dateCreated  DateTime  @default(now()) @map("date_created")
-  lastModified DateTime  @updatedAt @map("last_modified")
-  vehicles     Vehicle[]
+  dateCreated   DateTime       @default(now()) @map("date_created")
+  lastModified  DateTime       @updatedAt @map("last_modified")
+  vehicles      Vehicle[]
+  serviceOrders ServiceOrder[]
+  estimates     Estimate[]
 
   @@map("customers")
 }
@@ -121,7 +123,9 @@ model Vehicle {
   dateRegistered DateTime @default(now()) @map("date_registered")
 
   // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceOrders ServiceOrder[]
+  estimates     Estimate[]
 
   @@index([customerId])
   @@map("vehicles")
@@ -151,5 +155,195 @@ model InventoryItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  serviceOrderItems ServiceOrderItem[]
+  estimateItems     EstimateItem[]
+
   @@map("inventory_items")
+}
+
+// --- Service Order Feature ---
+enum EstimateStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum ItemType {
+  PART
+  LABOR
+}
+
+model Estimate {
+  id     String         @id @default(cuid()) @map("estimate_id")
+  status EstimateStatus @default(PENDING)
+
+  // Financials (Only totals, no payments yet)
+  laborTotal  Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
+  partsTotal  Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
+  totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  // Relations
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  // One-to-Many Relations
+  items EstimateItem[]
+
+  // Link to the eventual Service Order
+  // If this is null, the estimate hasn't been turned into a job yet
+  convertedServiceOrder ServiceOrder?
+
+  // Dates
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  expiryDate DateTime? @map("expiry_date") // Optional: Quote valid until...
+
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("estimates")
+}
+
+model EstimateItem {
+  id         String   @id @default(cuid()) @map("estimate_item_id")
+  estimateId String   @map("estimate_id")
+  type       ItemType // PART or LABOR
+
+  // Item Details
+  name        String
+  description String?
+  quantity    Int     @default(1)
+
+  // Pricing
+  price Decimal @db.Decimal(10, 2)
+  total Decimal @db.Decimal(10, 2)
+
+  // Inventory Relation
+  // We link this to check current price/stock, but we DO NOT deduct stock yet
+  inventoryItemId Int?           @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // Relation
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@map("estimate_items")
+}
+
+model ServiceOrder {
+  id     String      @id @default(cuid()) @map("order_id")
+  status OrderStatus @default(PENDING)
+
+  // Financials
+  // We separate parts and labor to help with the "itemized receipt" requirement
+  laborTotal  Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
+  partsTotal  Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
+  totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  // Installment / Debt Tracking
+  amountPaid Decimal @default(0) @map("amount_paid") @db.Decimal(10, 2)
+
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status") // UNPAID, PARTIAL, PAID
+
+  // Relations
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  sourceEstimateId String?                  @unique @map("source_estimate_id")
+  sourceEstimate   Estimate?                @relation(fields: [sourceEstimateId], references: [id])
+  // One-to-Many Relations
+  items            ServiceOrderItem[]
+  payments         Payment[]
+  attachments      ServiceOrderAttachment[]
+
+  // Dates
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  estimatedCompletion DateTime? @map("estimated_completion")
+
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("service_orders")
+}
+
+model ServiceOrderItem {
+  id      String   @id @default(cuid()) @map("item_id")
+  orderId String   @map("order_id")
+  type    ItemType // PART or LABOR
+
+  // Item Details
+  name        String // e.g., "Change Oil Labor" or "Ford Oil Filter"
+  description String?
+  quantity    Int     @default(1)
+
+  // Pricing
+  price Decimal @db.Decimal(10, 2) // The price AT THE TIME of sale (Snapshot)
+  total Decimal @db.Decimal(10, 2) // price * quantity
+
+  // Inventory Relation (Optional because Labor has no inventory ID)
+  // NOTE: Your InventoryItem uses an Int ID, so this must be Int
+  inventoryItemId Int?           @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // Relation back to Order
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("service_order_items")
+}
+
+model Payment {
+  id      String @id @default(cuid()) @map("payment_id")
+  orderId String @map("order_id")
+
+  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod @default(CASH)
+  referenceNo String?       @map("reference_no") // For GCash Ref Numbers
+  date        DateTime      @default(now())
+  notes       String?       @db.Text
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model ServiceOrderAttachment {
+  id      String @id @default(cuid()) @map("attachment_id")
+  orderId String @map("order_id")
+
+  imageUrl   String   @map("image_url") // The ImageKit URL
+  fileId     String?  @map("file_id") // For deleting later
+  caption    String? // e.g., "Rusted brake caliper - Before"
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("service_order_attachments")
 }
