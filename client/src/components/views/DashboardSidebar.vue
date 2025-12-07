@@ -201,13 +201,13 @@ const toggleDarkMode = () => {
         <img 
           src="/logo/symbol_w_wordmark_primary.png" 
           alt="DAD-J Auto Shop" 
-          class="h-auto w-30 transition-all duration-300 group-data-[collapsible=icon]:hidden"
+          class="h-auto w-36 transition-all duration-300 group-data-[collapsible=icon]:hidden"
         />
         <!-- Logo for collapsed state -->
         <img 
           src="/logo/primary_logo.png" 
           alt="DAD-J" 
-          class="h-auto w-14 hidden group-data-[collapsible=icon]:block transition-all duration-300"
+          class="h-auto w-18 hidden group-data-[collapsible=icon]:block transition-all duration-300"
         />
       </div>
       <div class="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -324,7 +324,7 @@ const toggleDarkMode = () => {
             <SidebarMenu class="space-y-1 group-data-[collapsible=icon]:space-y-1">
               <template v-for="item in systemItems" :key="item.title">
                   <SidebarMenuItem 
-                    v-if="!item.adminOnly || (item.adminOnly && authStore.currentUser.role === 'admin')"
+                    v-if="!item.adminOnly || (item.adminOnly && authStore.currentUser?.role === 'admin')"
                     class="group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
                   >
                     <Tooltip>

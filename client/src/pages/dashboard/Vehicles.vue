@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Car, 
@@ -9,7 +9,9 @@ import {
   Users, 
   Calendar,
   AlertCircle,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
 import {
   Card,
@@ -41,11 +43,7 @@ import { Badge } from '@/components/ui/badge'
 import { getAllVehicles } from '@/api/vehicles'
 import VehicleDetailsSheet from '@/components/views/vehicles/VehicleDetailsSheet.vue'
 
-// ... imports
-import { 
-  ChevronLeft, 
-  ChevronRight 
-} from 'lucide-vue-next'
+
 
 const router = useRouter()
 const vehicles = ref([])
@@ -149,11 +147,7 @@ const stats = computed(() => {
   ]
 })
 
-// Derived from current page vehicles - effectively "Makes on this page"
-const uniqueMakes = computed(() => {
-  const makes = new Set(vehicles.value.map(v => v.make))
-  return ['All', ...Array.from(makes).sort()]
-})
+const uniqueMakes = ref(['All'])
 
 const fetchVehicles = async () => {
   try {
@@ -173,6 +167,9 @@ const fetchVehicles = async () => {
       totalVehicles.value = response.meta.total
       totalPages.value = response.meta.totalPages
       currentPage.value = response.meta.page
+      if (response.meta.uniqueMakes) {
+        uniqueMakes.value = response.meta.uniqueMakes
+      }
     }
   } catch (error) {
     console.error('Failed to fetch vehicles:', error)
@@ -198,6 +195,11 @@ const openDetails = (vehicle) => {
 
 onMounted(() => {
   fetchVehicles()
+})
+
+onBeforeUnmount(() => {
+  if (debounceTimeout) clearTimeout(debounceTimeout)
+  debounceTimeout = null
 })
 </script>
 
@@ -314,7 +316,7 @@ onMounted(() => {
                   <Button 
                     v-if="searchQuery || filterMake !== 'All'"
                     variant="link" 
-                    @click="{ searchQuery = ''; filterMake = 'All' }"
+                    @click="() => { searchQuery = ''; filterMake = 'All' }"
                     class="text-primary mt-2"
                   >
                     Clear all filters

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getCustomer } from '@/api/customers'
@@ -120,7 +120,7 @@ const vehicleMakeFilter = ref('All')
 const vehicleUniqueMakes = ref<string[]>([])
 const vehicleSortBy = ref('dateRegistered')
 const vehicleSortOrder = ref<'asc' | 'desc'>('desc')
-let searchTimeout: NodeJS.Timeout
+let searchTimeout: ReturnType<typeof setTimeout> | undefined
 
 // Methods
 const fetchCustomerData = async () => {
@@ -190,9 +190,6 @@ const handlePageChange = (newPage: number) => {
     vehiclePage.value = newPage
     fetchVehicles()
 }
-
-// Watchers for Search and Filter
-import { watch } from 'vue'
 
 watch(vehicleSearch, () => {
     clearTimeout(searchTimeout)

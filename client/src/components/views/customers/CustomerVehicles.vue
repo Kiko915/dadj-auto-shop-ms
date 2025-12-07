@@ -109,7 +109,7 @@ const handleSort = (field: string) => {
                   All Makes
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  v-for="make in uniqueMakes" 
+                  v-for="make in uniqueMakes?.filter(m => m !== 'All' && m !== 'All Makes') || []" 
                   :key="make"
                   @click="emit('update:filterMake', make)"
                 >
@@ -254,8 +254,8 @@ const handleSort = (field: string) => {
             <Button
               variant="outline"
               size="sm"
-              :disabled="currentPage === 1"
-              @click="$emit('changePage', currentPage! - 1)"
+              :disabled="!currentPage || currentPage <= 1"
+              @click="$emit('changePage', (currentPage || 1) - 1)"
             >
               <ChevronLeft class="h-4 w-4 mr-2" />
               Previous
@@ -263,8 +263,8 @@ const handleSort = (field: string) => {
             <Button
               variant="outline"
               size="sm"
-              :disabled="currentPage === totalPages"
-              @click="$emit('changePage', currentPage! + 1)"
+              :disabled="!currentPage || !totalPages || currentPage >= totalPages"
+              @click="$emit('changePage', (currentPage || 1) + 1)"
             >
               Next
               <ChevronRight class="h-4 w-4 ml-2" />

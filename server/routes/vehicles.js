@@ -18,8 +18,8 @@ const router = express.Router();
 // server/routes/vehicles.js
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const pageSize = parseInt(req.query.pageSize) || 10;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 10));
         const search = req.query.search || '';
         const make = req.query.make || 'All';
 
@@ -39,17 +39,19 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
                 { model: { contains: search, mode: 'insensitive' } },
                 {
                     customer: {
-                        OR: [
-                            { firstName: { contains: search, mode: 'insensitive' } },
-                            { lastName: { contains: search, mode: 'insensitive' } }
-                        ]
+                        is: {
+                            OR: [
+                                { firstName: { contains: search, mode: 'insensitive' } },
+                                { lastName: { contains: search, mode: 'insensitive' } }
+                            ]
+                        }
                     }
                 }
             ];
         }
 
         // Parallel execution for count and data
-        const [total, vehicles] = await Promise.all([
+        const [total, vehicles, uniqueMakesData] = await Promise.all([
             prisma.vehicle.count({ where }),
             prisma.vehicle.findMany({
                 where,
@@ -78,9 +80,15 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
                 orderBy: {
                     dateRegistered: 'desc'
                 }
+            }),
+            prisma.vehicle.findMany({
+                select: { make: true },
+                distinct: ['make'],
+                orderBy: { make: 'asc' }
             })
         ]);
 
+        const uniqueMakes = ['All', ...uniqueMakesData.map(v => v.make)];
         const totalPages = Math.ceil(total / pageSize);
 
         return res.status(200).json({
@@ -90,7 +98,8 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
                 total,
                 page,
                 pageSize,
-                totalPages
+                totalPages,
+                uniqueMakes
             }
         });
     } catch (error) {
@@ -116,8 +125,15 @@ router.get('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 
         const pageSize = parseInt(req.query.pageSize) || 10;
         const search = req.query.search || '';
         const make = req.query.make || 'All';
-        const sortBy = req.query.sortBy || 'dateRegistered';
-        const sortOrder = req.query.sortOrder || 'desc';
+        const allowedSortBy = ['licensePlate', 'make', 'model', 'year', 'mileage', 'dateRegistered'];
+        const allowedSortOrder = ['asc', 'desc'];
+
+        let sortBy = req.query.sortBy || 'dateRegistered';
+        let sortOrder = req.query.sortOrder || 'desc';
+
+        if (!allowedSortBy.includes(sortBy)) sortBy = 'dateRegistered';
+        if (!allowedSortOrder.includes(sortOrder)) sortOrder = 'desc';
+
         const skip = (page - 1) * pageSize;
 
         // Build Where Clause
@@ -147,10 +163,12 @@ router.get('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 
             prisma.vehicle.findMany({
                 where: { customerId },
                 select: { make: true },
-                distinct: ['make']
+                distinct: ['make'],
+                orderBy: { make: 'asc' }
             })
         ]);
 
+        const uniqueMakes = ['All', ...uniqueMakesData.map(v => v.make)];
         const totalPages = Math.ceil(total / pageSize);
 
         return res.status(200).json({
@@ -160,7 +178,10 @@ router.get('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 
                 total,
                 page,
                 pageSize,
-                totalPages
+                totalPages,
+                uniqueMakes,
+                sortBy,
+                sortOrder
             }
         });
     } catch (error) {
