@@ -2,13 +2,26 @@
 import api from './index'
 
 /**
+ * Get all vehicles in the system
+ * @returns {Promise} Response with vehicles array
+ */
+export const getAllVehicles = async (params = {}) => {
+  try {
+    const response = await api.get('/vehicles', { params })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
  * Get all vehicles for a specific customer
  * @param {string} customerId - Customer ID
  * @returns {Promise} Response with vehicles array
  */
-export const getCustomerVehicles = async (customerId) => {
+export const getCustomerVehicles = async (customerId, params = {}) => {
   try {
-    const response = await api.get(`/vehicles/customer/${customerId}`)
+    const response = await api.get(`/vehicles/customer/${customerId}`, { params })
     return response.data
   } catch (error) {
     throw error

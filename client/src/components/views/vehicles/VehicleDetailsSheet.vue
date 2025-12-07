@@ -24,7 +24,8 @@ import { getVehicle } from '@/api/vehicles'
 const props = defineProps({
   open: Boolean,
   vehicleId: [String],
-  vehicle: [Object] // Optional: pass vehicle object directly to avoid fetch if desired, but we'll fetch for freshness
+  vehicle: [Object], // Optional: pass vehicle object directly to avoid fetch if desired, but we'll fetch for freshness
+  readonly: Boolean
 })
 
 const emit = defineEmits(['update:open', 'edit', 'delete'])
@@ -192,7 +193,7 @@ import formatDate from '@/utils/formatDate'
         </div>
 
         <!-- Footer Actions -->
-        <div class="p-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div v-if="!readonly" class="p-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div class="flex gap-3">
             <Button class="flex-1" variant="outline" @click="$emit('edit', item)">
               <Edit class="mr-2 h-4 w-4" /> Edit Details

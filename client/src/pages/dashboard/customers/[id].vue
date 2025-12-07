@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getCustomer } from '@/api/customers'
@@ -110,20 +111,26 @@ const fullName = computed(() => {
 })
 
 // Methods
+// Pagination State for Vehicles
+const vehiclePage = ref(1)
+const vehiclePageSize = ref(5) // Smaller page size for tab view
+const vehicleTotal = ref(0)
+const vehicleTotalPages = ref(1)
+const vehicleSearch = ref('')
+const vehicleMakeFilter = ref('All')
+const vehicleUniqueMakes = ref<string[]>([])
+const vehicleSortBy = ref('dateRegistered')
+const vehicleSortOrder = ref<'asc' | 'desc'>('desc')
+let searchTimeout: ReturnType<typeof setTimeout> | undefined
+
+// Methods
 const fetchCustomerData = async () => {
   try {
     isLoading.value = true
     const response = await getCustomer(customerId.value)
     customer.value = response.customer
 
-    // Fetch vehicles
-    try {
-      const vehiclesResponse = await getCustomerVehicles(customerId.value)
-      vehicles.value = vehiclesResponse.vehicles || []
-    } catch (error) {
-      console.warn('Failed to fetch vehicles:', error)
-      vehicles.value = []
-    }
+    await fetchVehicles()
 
     // Fetch service history
     try {
@@ -150,6 +157,57 @@ const fetchCustomerData = async () => {
     isLoading.value = false
   }
 }
+
+const fetchVehicles = async () => {
+  try {
+    const params = {
+      page: vehiclePage.value,
+      pageSize: vehiclePageSize.value,
+      search: vehicleSearch.value,
+      make: vehicleMakeFilter.value,
+      sortBy: vehicleSortBy.value,
+      sortOrder: vehicleSortOrder.value
+    }
+    const vehiclesResponse = await getCustomerVehicles(customerId.value, params)
+    vehicles.value = vehiclesResponse.vehicles || []
+    
+    // Update pagination state
+    if (vehiclesResponse.meta) {
+        vehicleTotal.value = vehiclesResponse.meta.total
+        vehicleTotalPages.value = vehiclesResponse.meta.totalPages
+        vehiclePage.value = vehiclesResponse.meta.page
+        if (vehiclesResponse.meta.uniqueMakes) {
+             vehicleUniqueMakes.value = vehiclesResponse.meta.uniqueMakes
+        }
+    }
+  } catch (error) {
+    console.warn('Failed to fetch vehicles:', error)
+    vehicles.value = []
+  }
+}
+
+const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > vehicleTotalPages.value) return
+    vehiclePage.value = newPage
+    fetchVehicles()
+}
+
+watch(vehicleSearch, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        vehiclePage.value = 1
+        fetchVehicles()
+    }, 300)
+})
+
+watch(vehicleMakeFilter, () => {
+    vehiclePage.value = 1
+    fetchVehicles()
+})
+
+watch([vehicleSortBy, vehicleSortOrder], () => {
+    fetchVehicles()
+})
 
 const handleEditProfile = () => {
   isEditModalOpen.value = true
@@ -202,7 +260,7 @@ const confirmDeleteVehicle = async () => {
     isDeletingVehicle.value = true
     await deleteVehicle(selectedVehicle.value.id)
     toast.success('Vehicle deleted successfully')
-    await fetchCustomerData()
+    await fetchVehicles()
     isDeleteVehicleModalOpen.value = false
     isVehicleDetailsSheetOpen.value = false // Close sheet if open
   } catch (error) {
@@ -232,7 +290,10 @@ const handleVehicleSaved = async (vehicleData: any) => {
     isAddVehicleModalOpen.value = false
     
     // Refresh data
-    await fetchCustomerData()
+    if (vehicleFormMode.value === 'create') {
+        vehiclePage.value = 1
+    }
+    await fetchVehicles()
   } catch (error: any) {
     console.error('Failed to save vehicle:', error)
     if (error.response?.status === 409) {
@@ -261,6 +322,13 @@ const goBack = () => {
 
 onMounted(() => {
   fetchCustomerData()
+})
+
+onBeforeUnmount(() => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+    searchTimeout = undefined
+  }
 })
 </script>
 
@@ -330,10 +398,23 @@ onMounted(() => {
             :vehicles="vehicles"
             :show-notice="showVehicleNotice"
             :customer-full-name="fullName"
+            :current-page="vehiclePage"
+            :total-pages="vehicleTotalPages"
+            :total-vehicles="vehicleTotal"
+            :search="vehicleSearch"
+            :filter-make="vehicleMakeFilter"
+            :unique-makes="vehicleUniqueMakes"
+            :sort-by="vehicleSortBy"
+            :sort-order="vehicleSortOrder"
+            @update:search="vehicleSearch = $event"
+            @update:filter-make="vehicleMakeFilter = $event"
+            @update:sort-by="vehicleSortBy = $event"
+            @update:sort-order="vehicleSortOrder = $event"
             @add-vehicle="handleAddVehicle"
             @view-vehicle="handleViewVehicle"
             @edit-vehicle="handleEditVehicle"
             @delete-vehicle="handleDeleteVehicle"
+            @change-page="handlePageChange"
           />
         </TabsContent>
 

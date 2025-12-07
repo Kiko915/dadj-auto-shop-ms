@@ -9,6 +9,109 @@ import imagekit from '../config/imagekit.js';
 const router = express.Router();
 
 /**
+ * @route GET /api/vehicles
+ * @desc Get all vehicles in the system
+ * @access Staff, Admin
+ * @returns {200} { message: string, vehicles: Array } - Successfully retrieved list of vehicles
+ * @returns {500} { message: string, error: string } - Failed to retrieve vehicles
+ */
+// server/routes/vehicles.js
+router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 10));
+        const search = req.query.search || '';
+        const make = req.query.make || 'All';
+
+        const skip = (page - 1) * pageSize;
+
+        // Build Where Clause
+        const where = {};
+
+        if (make !== 'All') {
+            where.make = make;
+        }
+
+        if (search) {
+            where.OR = [
+                { licensePlate: { contains: search, mode: 'insensitive' } },
+                { make: { contains: search, mode: 'insensitive' } },
+                { model: { contains: search, mode: 'insensitive' } },
+                {
+                    customer: {
+                        is: {
+                            OR: [
+                                { firstName: { contains: search, mode: 'insensitive' } },
+                                { lastName: { contains: search, mode: 'insensitive' } }
+                            ]
+                        }
+                    }
+                }
+            ];
+        }
+
+        // Parallel execution for count and data
+        const [total, vehicles, uniqueMakesData] = await Promise.all([
+            prisma.vehicle.count({ where }),
+            prisma.vehicle.findMany({
+                where,
+                skip,
+                take: pageSize,
+                // Select only necessary fields for the list view
+                select: {
+                    id: true,
+                    licensePlate: true,
+                    make: true,
+                    model: true,
+                    year: true,
+                    mileage: true,
+                    dateRegistered: true,
+                    imageUrl: true,
+                    vehicleType: true,
+                    customerId: true, // Needed for owner link
+                    customer: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            phoneNumber: true
+                        }
+                    }
+                },
+                orderBy: {
+                    dateRegistered: 'desc'
+                }
+            }),
+            prisma.vehicle.findMany({
+                select: { make: true },
+                distinct: ['make'],
+                orderBy: { make: 'asc' }
+            })
+        ]);
+
+        const uniqueMakes = ['All', ...uniqueMakesData.map(v => v.make)];
+        const totalPages = Math.ceil(total / pageSize);
+
+        return res.status(200).json({
+            message: 'All vehicles retrieved successfully',
+            vehicles,
+            meta: {
+                total,
+                page,
+                pageSize,
+                totalPages,
+                uniqueMakes
+            }
+        });
+    } catch (error) {
+        console.error('Get All Vehicles Error:', error);
+        return res.status(500).json({
+            message: 'Failed to retrieve vehicles',
+            error: 'VEHICLE_ERROR',
+        });
+    }
+});
+
+/**
  * @route GET /api/vehicles/customer/:customerId
  * @desc Get all vehicles belonging to a specific customer
  * @access Staff, Admin
@@ -18,13 +121,68 @@ const router = express.Router();
 router.get('/customer/:customerId', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { customerId } = req.params;
-        const vehicles = await prisma.vehicle.findMany({
-            where: { customerId },
-        });
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const search = req.query.search || '';
+        const make = req.query.make || 'All';
+        const allowedSortBy = ['licensePlate', 'make', 'model', 'year', 'mileage', 'dateRegistered'];
+        const allowedSortOrder = ['asc', 'desc'];
+
+        let sortBy = req.query.sortBy || 'dateRegistered';
+        let sortOrder = req.query.sortOrder || 'desc';
+
+        if (!allowedSortBy.includes(sortBy)) sortBy = 'dateRegistered';
+        if (!allowedSortOrder.includes(sortOrder)) sortOrder = 'desc';
+
+        const skip = (page - 1) * pageSize;
+
+        // Build Where Clause
+        const where = { customerId };
+
+        if (make !== 'All') {
+            where.make = make;
+        }
+
+        if (search) {
+            where.OR = [
+                { licensePlate: { contains: search, mode: 'insensitive' } },
+                { make: { contains: search, mode: 'insensitive' } },
+                { model: { contains: search, mode: 'insensitive' } },
+                { vin: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        const [total, vehicles, uniqueMakesData] = await Promise.all([
+            prisma.vehicle.count({ where }),
+            prisma.vehicle.findMany({
+                where,
+                skip,
+                take: pageSize,
+                orderBy: { [sortBy]: sortOrder }
+            }),
+            prisma.vehicle.findMany({
+                where: { customerId },
+                select: { make: true },
+                distinct: ['make'],
+                orderBy: { make: 'asc' }
+            })
+        ]);
+
+        const uniqueMakes = ['All', ...uniqueMakesData.map(v => v.make)];
+        const totalPages = Math.ceil(total / pageSize);
 
         return res.status(200).json({
             message: 'Vehicles retrieved successfully',
             vehicles,
+            meta: {
+                total,
+                page,
+                pageSize,
+                totalPages,
+                uniqueMakes,
+                sortBy,
+                sortOrder
+            }
         });
     } catch (error) {
         console.error('Get Vehicles Error:', error);

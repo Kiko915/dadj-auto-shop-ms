@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Car, Plus, Info, MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-vue-next'
+import { Car, Plus, Info, MoreHorizontal, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-vue-next'
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,14 @@ const props = defineProps<{
   vehicles: Vehicle[]
   showNotice?: boolean
   customerFullName: string
+  currentPage?: number
+  totalPages?: number
+  totalVehicles?: number
+  search?: string
+  filterMake?: string
+  uniqueMakes?: string[]
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }>()
 
 const emit = defineEmits<{
@@ -33,7 +42,21 @@ const emit = defineEmits<{
   viewVehicle: [vehicle: Vehicle]
   editVehicle: [vehicle: Vehicle]
   deleteVehicle: [vehicle: Vehicle]
+  changePage: [page: number]
+  'update:search': [value: string]
+  'update:filterMake': [value: string]
+  'update:sortBy': [value: string]
+  'update:sortOrder': [value: 'asc' | 'desc']
 }>()
+
+const handleSort = (field: string) => {
+    if (props.sortBy === field) {
+        emit('update:sortOrder', props.sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+        emit('update:sortBy', field)
+        emit('update:sortOrder', 'asc')
+    }
+}
 </script>
 
 <template>
@@ -54,15 +77,52 @@ const emit = defineEmits<{
 
     <Card>
       <CardHeader>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-4">
           <div>
             <CardTitle>Registered Vehicles</CardTitle>
             <CardDescription>Manage customer's vehicles</CardDescription>
           </div>
-          <Button @click="emit('addVehicle')">
-            <Plus class="h-4 w-4 mr-2" />
-            Add New Vehicle
-          </Button>
+          <div class="flex items-center gap-2">
+             <!-- Search -->
+            <div class="relative w-full max-w-sm">
+              <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search vehicles..." 
+                class="pl-8 w-[200px] lg:w-[300px]" 
+                :model-value="search"
+                @update:model-value="(val) => emit('update:search', val.toString())"
+              />
+            </div>
+
+            <!-- Filter -->
+             <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="outline" class="gap-2">
+                  <Filter class="h-4 w-4" />
+                  {{ filterMake && filterMake !== 'All' ? filterMake : 'Filter' }}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by Make</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem @click="emit('update:filterMake', 'All')">
+                  All Makes
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  v-for="make in uniqueMakes?.filter(m => m !== 'All' && m !== 'All Makes') || []" 
+                  :key="make"
+                  @click="emit('update:filterMake', make)"
+                >
+                  {{ make }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button @click="emit('addVehicle')">
+              <Plus class="h-4 w-4 mr-2" />
+              Add New Vehicle
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -84,11 +144,66 @@ const emit = defineEmits<{
           <table class="w-full">
             <thead class="bg-muted/50">
               <tr class="border-b">
-                <th class="px-4 py-3 text-left text-sm font-medium">License Plate</th>
-                <th class="px-4 py-3 text-left text-sm font-medium">Make & Model</th>
-                <th class="px-4 py-3 text-left text-sm font-medium">Year</th>
-                <th class="px-4 py-3 text-left text-sm font-medium">Type</th>
-                <th class="px-4 py-3 text-left text-sm font-medium">Mileage</th>
+                <th 
+                    class="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                    @click="handleSort('licensePlate')"
+                >
+                    <div class="flex items-center gap-2">
+                        License Plate
+                        <component 
+                            :is="sortBy === 'licensePlate' ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown" 
+                            class="h-3 w-3"
+                        />
+                    </div>
+                </th>
+                <th 
+                    class="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                    @click="handleSort('make')"
+                >
+                    <div class="flex items-center gap-2">
+                        Make & Model
+                        <component 
+                            :is="sortBy === 'make' ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown" 
+                            class="h-3 w-3"
+                        />
+                    </div>
+                </th>
+                <th 
+                    class="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                    @click="handleSort('year')"
+                >
+                    <div class="flex items-center gap-2">
+                        Year
+                        <component 
+                            :is="sortBy === 'year' ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown" 
+                            class="h-3 w-3"
+                        />
+                    </div>
+                </th>
+                <th 
+                    class="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                    @click="handleSort('vehicleType')"
+                >
+                     <div class="flex items-center gap-2">
+                        Type
+                        <component 
+                            :is="sortBy === 'vehicleType' ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown" 
+                            class="h-3 w-3"
+                        />
+                    </div>
+                </th>
+                <th 
+                    class="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                    @click="handleSort('mileage')"
+                >
+                     <div class="flex items-center gap-2">
+                        Mileage
+                        <component 
+                            :is="sortBy === 'mileage' ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown" 
+                            class="h-3 w-3"
+                        />
+                    </div>
+                </th>
                 <th class="px-4 py-3 text-right text-sm font-medium">Actions</th>
               </tr>
             </thead>
@@ -128,6 +243,33 @@ const emit = defineEmits<{
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div v-if="totalPages && totalPages > 1" class="flex items-center justify-between space-x-2 py-4 border-t mt-4">
+          <div class="text-sm text-muted-foreground">
+            Page {{ currentPage }} of {{ totalPages }} ({{ totalVehicles }} vehicles)
+          </div>
+          <div class="space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="!currentPage || currentPage <= 1"
+              @click="$emit('changePage', (currentPage || 1) - 1)"
+            >
+              <ChevronLeft class="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="!currentPage || !totalPages || currentPage >= totalPages"
+              @click="$emit('changePage', (currentPage || 1) + 1)"
+            >
+              Next
+              <ChevronRight class="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
