@@ -162,6 +162,13 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
         const where = {};
 
         if (status) {
+            const validStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'DECLINED', 'EXPIRED'];
+            if (!validStatuses.includes(status)) {
+                return res.status(400).json({
+                    message: `Invalid status filter. Allowed values: ${validStatuses.join(', ')}`,
+                    error: 'INVALID_STATUS_FILTER'
+                });
+            }
             where.status = status;
         }
 

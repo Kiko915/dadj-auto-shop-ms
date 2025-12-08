@@ -49,14 +49,6 @@ const saveEstimate = async (status = 'PENDING') => {
 
   isSubmitting.value = true
   try {
-    // Validate totals match
-    const calculatedTotal = items.value.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    // Allow for small floating point differences
-    if (Math.abs(calculatedTotal - (partsTotal.value + laborTotal.value)) > 0.01) {
-      toast.error('Calculation Error: Totals do not match. Please refresh and try again.')
-      return
-    }
-
     const payload = {
       customerId: selectedCustomer.value.id,
       vehicleId: selectedVehicleId.value,
