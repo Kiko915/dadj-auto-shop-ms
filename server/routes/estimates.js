@@ -4,6 +4,8 @@ import prisma from '../db.js';
 
 const router = express.Router();
 
+const VALID_ESTIMATE_STATUSES = Object.freeze(['DRAFT', 'PENDING', 'APPROVED', 'DECLINED', 'EXPIRED']);
+
 /**
  * @route POST /api/estimates
  * @desc Create a new Estimate
@@ -31,10 +33,9 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
         } = req.body;
 
         // Extended Validation
-        const validStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'DECLINED', 'EXPIRED'];
-        if (status && !validStatuses.includes(status)) {
+        if (status && !VALID_ESTIMATE_STATUSES.includes(status)) {
             return res.status(400).json({
-                message: `Invalid status. Allowed values: ${validStatuses.join(', ')}`,
+                message: `Invalid status. Allowed values: ${VALID_ESTIMATE_STATUSES.join(', ')}`,
                 error: 'INVALID_STATUS'
             });
         }
@@ -55,6 +56,19 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                     error: 'INVALID_TOTAL'
                 });
             }
+        }
+
+        // Validate expiryDate
+        let validExpiryDate = null;
+        if (expiryDate) {
+            const parsedDate = new Date(expiryDate);
+            if (isNaN(parsedDate.getTime())) {
+                return res.status(400).json({
+                    message: 'Invalid expiryDate format provided',
+                    error: 'INVALID_DATE'
+                });
+            }
+            validExpiryDate = parsedDate;
         }
 
         // Validate and Parse Items
@@ -122,7 +136,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 customerId,
                 vehicleId,
                 status: status || 'PENDING',
-                expiryDate: expiryDate ? new Date(expiryDate) : null,
+                expiryDate: validExpiryDate,
                 laborTotal: laborTotal || 0,
                 partsTotal: partsTotal || 0,
                 totalAmount: totalAmount || 0,
@@ -162,10 +176,9 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
         const where = {};
 
         if (status) {
-            const validStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'DECLINED', 'EXPIRED'];
-            if (!validStatuses.includes(status)) {
+            if (!VALID_ESTIMATE_STATUSES.includes(status)) {
                 return res.status(400).json({
-                    message: `Invalid status filter. Allowed values: ${validStatuses.join(', ')}`,
+                    message: `Invalid status filter. Allowed values: ${VALID_ESTIMATE_STATUSES.join(', ')}`,
                     error: 'INVALID_STATUS_FILTER'
                 });
             }
