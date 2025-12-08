@@ -174,11 +174,19 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
 
         if (search) {
             where.OR = [
-                { id: { contains: search, mode: 'insensitive' } },
                 { customer: { firstName: { contains: search, mode: 'insensitive' } } },
                 { customer: { lastName: { contains: search, mode: 'insensitive' } } },
                 { vehicle: { licensePlate: { contains: search, mode: 'insensitive' } } }
             ];
+
+            // Check if search looks like a numeric ID or UUID/CUID and add exact match
+            // Note: Schema defines ID as String, so we pass raw string even for numeric-looking inputs
+            const isNumeric = /^[0-9]+$/.test(search);
+            const isUuid = /^[0-9a-fA-F-]{36}$/.test(search);
+
+            if (isNumeric || isUuid) {
+                where.OR.push({ id: search });
+            }
         }
 
         const estimates = await prisma.estimate.findMany({
