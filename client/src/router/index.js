@@ -74,6 +74,11 @@ const router = createRouter({
           path: 'inventory',
           name: 'inventory',
           component: () => import('@/pages/dashboard/inventory/Inventory.vue'),
+        },
+        {
+          path: 'estimates/new',
+          name: 'new-estimate',
+          component: () => import('@/pages/dashboard/estimates/new.vue'),
         }
       ]
     },

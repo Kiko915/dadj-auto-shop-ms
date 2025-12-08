@@ -164,6 +164,7 @@ model InventoryItem {
 
 // --- Service Order Feature ---
 enum EstimateStatus {
+  DRAFT
   PENDING
   APPROVED
   DECLINED
