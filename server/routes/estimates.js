@@ -47,6 +47,26 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             });
         }
 
+        // Validate Existence
+        const [customerExists, vehicleExists] = await Promise.all([
+            prisma.customer.findUnique({ where: { id: customerId } }),
+            prisma.vehicle.findUnique({ where: { id: vehicleId } })
+        ]);
+
+        if (!customerExists) {
+            return res.status(400).json({
+                message: 'Customer not found',
+                error: 'CUSTOMER_NOT_FOUND'
+            });
+        }
+
+        if (!vehicleExists) {
+            return res.status(400).json({
+                message: 'Vehicle not found',
+                error: 'VEHICLE_NOT_FOUND'
+            });
+        }
+
         // Validate Totals
         const totals = { laborTotal, partsTotal, totalAmount };
         for (const [key, value] of Object.entries(totals)) {
