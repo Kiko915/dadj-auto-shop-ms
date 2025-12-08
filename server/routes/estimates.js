@@ -70,7 +70,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
         // Validate Totals
         const totals = { laborTotal, partsTotal, totalAmount };
         for (const [key, value] of Object.entries(totals)) {
-            if (value !== undefined && (typeof value !== 'number' || value < 0)) {
+            if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
                 return res.status(400).json({
                     message: `Invalid ${key}: must be a non-negative number`,
                     error: 'INVALID_TOTAL'
@@ -166,8 +166,12 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             },
             include: {
                 items: true,
-                customer: true,
-                vehicle: true
+                customer: {
+                    select: { firstName: true, lastName: true }
+                },
+                vehicle: {
+                    select: { make: true, model: true, licensePlate: true }
+                }
             }
         });
 
@@ -192,7 +196,10 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
  */
 router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { status, search } = req.query;
+        const { status, search, page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+
         const where = {};
 
         if (status) {
@@ -222,23 +229,33 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
             }
         }
 
-        const estimates = await prisma.estimate.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                customer: {
-                    select: { firstName: true, lastName: true }
-                },
-                vehicle: {
-                    select: { make: true, model: true, licensePlate: true }
-                },
-                _count: {
-                    select: { items: true }
+        const [estimates, total] = await prisma.$transaction([
+            prisma.estimate.findMany({
+                where,
+                skip,
+                take,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    customer: {
+                        select: { firstName: true, lastName: true }
+                    },
+                    vehicle: {
+                        select: { make: true, model: true, licensePlate: true }
+                    },
+                    _count: {
+                        select: { items: true }
+                    }
                 }
-            }
-        });
+            }),
+            prisma.estimate.count({ where })
+        ]);
 
-        res.json(estimates);
+        res.json({
+            items: estimates,
+            totalPages: Math.ceil(total / take),
+            currentPage: parseInt(page),
+            totalItems: total
+        });
     } catch (error) {
         console.error('Get Estimates Error:', error);
         res.status(500).json({ message: 'Failed to fetch estimates' });
