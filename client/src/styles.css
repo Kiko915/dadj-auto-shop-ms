@@ -117,19 +117,30 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 @keyframes collapsible-down {
-  from { height: 0; }
-  to { height: var(--radix-collapsible-content-height); }
+  from {
+    height: 0;
+  }
+
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
 }
 
 @keyframes collapsible-up {
-  from { height: var(--radix-collapsible-content-height); }
-  to { height: 0; }
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+
+  to {
+    height: 0;
+  }
 }
 
 .collapsible-content {
@@ -142,4 +153,20 @@
 
 .collapsible-content[data-state='closed'] {
   animation: collapsible-up 0.2s ease-out;
+}
+
+@media print {
+
+  /* Hide layout elements by class/ID if available, otherwise rely on scoped styles or add classes to layout */
+  header,
+  nav,
+  aside,
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Reset body for full width print */
+  body {
+    background-color: white;
+  }
 }

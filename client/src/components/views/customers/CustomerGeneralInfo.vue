@@ -1,30 +1,16 @@
-<script setup lang="ts">
+<script setup>
 import { computed } from 'vue'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Car, Package, DollarSign, Phone, Mail, Calendar, User, Clock } from 'lucide-vue-next'
 import formatDate from '@/utils/formatDate'
 
-type Customer = {
-  firstName: string
-  lastName: string
-  middleName?: string | null
-  suffix?: string | null
-  phoneNumber: string
-  email: string
-  birthday?: string | null
-  loyaltyStatus: string
-  totalVehicles: number
-  serviceCount: number
-  totalSpent: number
-  notes?: string | null
-  dateCreated: string
-  lastModified: string
-}
-
-const props = defineProps<{
-  customer: Customer
-}>()
+const props = defineProps({
+  customer: {
+    type: Object,
+    required: true
+  }
+})
 
 const formattedTotalSpent = computed(() => {
   return new Intl.NumberFormat('en-PH', {

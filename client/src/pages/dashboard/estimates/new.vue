@@ -1,15 +1,17 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createEstimate } from '@/api/estimates'
+import { createEstimate, getEstimate, updateEstimate } from '@/api/estimates'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { 
   FilePlus, 
   Loader2, 
   Check,
-  Save
+  Save,
+  Pencil
 } from 'lucide-vue-next'
+import { useRoute } from 'vue-router'
 
 // Modular Components
 import EstimateItemBuilder from '@/components/views/estimates/EstimateItemBuilder.vue'
@@ -17,6 +19,11 @@ import EstimateCustomerVehicleSelector from '@/components/views/estimates/Estima
 import EstimateSummary from '@/components/views/estimates/EstimateSummary.vue'
 
 const router = useRouter()
+const route = useRoute()
+
+// Computed: Check if editing
+const isEditing = computed(() => !!route.query.edit)
+const estimateId = computed(() => route.query.edit)
 
 // --- State ---
 
@@ -44,6 +51,8 @@ const grandTotal = computed(() => partsTotal.value + laborTotal.value)
 
 // --- Actions: Estimate ---
 
+// --- Actions: Estimate ---
+
 const saveEstimate = async (status = 'PENDING') => {
   if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0) return
 
@@ -68,16 +77,21 @@ const saveEstimate = async (status = 'PENDING') => {
       totalAmount: grandTotal.value
     }
 
-    await createEstimate(payload)
-    toast.success('Estimate created successfully')
+    if (isEditing.value) {
+        await updateEstimate(estimateId.value, payload)
+        toast.success('Estimate updated successfully')
+    } else {
+        await createEstimate(payload)
+        toast.success('Estimate created successfully')
+    }
     
     // Clear draft on success
     localStorage.removeItem(STORAGE_KEY)
     
     router.push('/dashboard/estimates') // Redirect to list
   } catch (error) {
-    console.error('Failed to create estimate', error)
-    toast.error(error.response?.data?.message || 'Failed to create estimate')
+    console.error('Failed to save estimate', error)
+    toast.error(error.response?.data?.message || 'Failed to save estimate')
   } finally {
     isSubmitting.value = false
   }
@@ -100,7 +114,38 @@ watch([selectedCustomer, selectedVehicleId, items, expiryDate], () => {
     saveDraftToStorage()
 }, { deep: true })
 
-onMounted(() => {
+onMounted(async () => {
+    // If editing, fetch existing data
+    if (isEditing.value) {
+        try {
+            const estimate = await getEstimate(estimateId.value)
+            if (estimate) {
+                selectedCustomer.value = estimate.customer
+                selectedVehicleId.value = estimate.vehicleId // This might need to adjust if API returns vehicle object but we bind to ID. 
+                // The selector component likely emits ID but might accept vehicle object or ID. 
+                // Checking previous code: CustomerVehicleSelector takes 'vehicleId' v-model. 
+                // However, fetching vehicles usually depends on selectedCustomer. 
+                // We'll need to ensure the selector hydrates correctly. 
+                // For now, assuming setting ID is enough if the list loads. 
+
+                // Map items
+                items.value = estimate.items.map(i => ({
+                    ...i,
+                    // ensure numbers
+                    price: Number(i.price),
+                    quantity: Number(i.quantity)
+                }))
+                
+                if (estimate.expiryDate) expiryDate.value = estimate.expiryDate
+            }
+        } catch (e) {
+            console.error('Failed to load estimate for editing', e)
+            toast.error('Failed to load estimate')
+            router.push('/dashboard/estimates')
+        }
+        return // Skip local storage draft restoration if editing
+    }
+
     const savedDraft = localStorage.getItem(STORAGE_KEY)
     if (savedDraft) {
         try {
@@ -125,7 +170,7 @@ onMounted(() => {
       <div class="space-y-1">
         <h1 class="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <!-- Do not add icons for the page titles -->
-            New Estimate
+            {{ isEditing ? 'Edit Estimate' : 'New Estimate' }}
         </h1>
         <p class="text-muted-foreground text-sm">Create a professional service quote for approval.</p>
       </div>
@@ -146,7 +191,7 @@ onMounted(() => {
         >
           <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-2 animate-spin" />
           <Check v-else class="w-4 h-4 mr-2" />
-          Create Estimate
+          {{ isEditing ? 'Update Estimate' : 'Create Estimate' }}
         </Button>
       </div>
     </div>

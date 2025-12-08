@@ -150,9 +150,15 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             });
         }
 
+        // Generate Custom ID
+        const year = new Date().getFullYear();
+        const random = Math.floor(1000 + Math.random() * 9000);
+        const customId = `EST-${year}-${random}`;
+
         // Create the Estimate and Items in a transaction (nested write)
         const newEstimate = await prisma.estimate.create({
             data: {
+                id: customId,
                 customerId,
                 vehicleId,
                 status: status || 'PENDING',
@@ -186,6 +192,37 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             message: 'Failed to create estimate',
             error: 'ESTIMATE_ERROR'
         });
+    }
+});
+
+/**
+ * @route GET /api/estimates/stats
+ * @desc Get estimate statistics
+ * @access Staff, Admin
+ */
+router.get('/stats', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const [totalEstimates, pendingEstimates, approvedEstimates, declinedEstimates, approvedRevenue] = await prisma.$transaction([
+            prisma.estimate.count(),
+            prisma.estimate.count({ where: { status: 'PENDING' } }),
+            prisma.estimate.count({ where: { status: 'APPROVED' } }),
+            prisma.estimate.count({ where: { status: 'DECLINED' } }),
+            prisma.estimate.aggregate({
+                _sum: { totalAmount: true },
+                where: { status: 'APPROVED' }
+            })
+        ]);
+
+        res.json({
+            totalEstimates,
+            pendingEstimates,
+            approvedEstimates,
+            declinedEstimates,
+            revenue: approvedRevenue._sum.totalAmount || 0
+        });
+    } catch (error) {
+        console.error('Get Estimate Stats Error:', error);
+        res.status(500).json({ message: 'Failed to fetch estimate stats' });
     }
 });
 
@@ -259,6 +296,194 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
     } catch (error) {
         console.error('Get Estimates Error:', error);
         res.status(500).json({ message: 'Failed to fetch estimates' });
+    }
+});
+
+/**
+ * @route GET /api/estimates/:id
+ * @desc Get a single estimate by ID
+ * @access Staff, Admin
+ */
+router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const estimate = await prisma.estimate.findUnique({
+            where: { id },
+            include: {
+                items: {
+                    include: {
+                        inventoryItem: true
+                    }
+                },
+                customer: true,
+                vehicle: true
+            }
+        });
+
+        if (!estimate) {
+            return res.status(404).json({ message: 'Estimate not found' });
+        }
+
+        res.json(estimate);
+    } catch (error) {
+        console.error('Get Estimate Error:', error);
+        res.status(500).json({ message: 'Failed to fetch estimate' });
+    }
+});
+
+/**
+ * @route PUT /api/estimates/:id
+ * @desc Update an estimate
+ * @access Staff, Admin
+ */
+router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            customerId,
+            vehicleId,
+            status,
+            expiryDate,
+            laborTotal,
+            partsTotal,
+            totalAmount,
+            items
+        } = req.body;
+
+        // Check if estimate exists
+        const existingEstimate = await prisma.estimate.findUnique({
+            where: { id }
+        });
+
+        if (!existingEstimate) {
+            return res.status(404).json({ message: 'Estimate not found' });
+        }
+
+        // Validate items if provided
+        let validItems = [];
+        if (items && Array.isArray(items)) {
+            for (const item of items) {
+                const quantity = Number.parseInt(item.quantity, 10);
+                const price = Number.parseFloat(item.price);
+                const total = Number.parseFloat(item.total);
+
+                validItems.push({
+                    type: item.type,
+                    name: item.name,
+                    description: item.description || null,
+                    quantity,
+                    price,
+                    total: Number.isFinite(total) ? total : (price * quantity),
+                    inventoryItemId: item.inventoryItemId ? Number.parseInt(item.inventoryItemId, 10) : null
+                });
+            }
+        }
+
+        // Transaction to update estimate and replace items
+        const updatedEstimate = await prisma.$transaction(async (prisma) => {
+            // 1. Delete existing items
+            if (items) {
+                await prisma.estimateItem.deleteMany({
+                    where: { estimateId: id }
+                });
+            }
+
+            // 2. Update estimate and create new items
+            return prisma.estimate.update({
+                where: { id },
+                data: {
+                    customerId: customerId || undefined,
+                    vehicleId: vehicleId || undefined,
+                    status: status || undefined,
+                    expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+                    laborTotal: laborTotal,
+                    partsTotal: partsTotal,
+                    totalAmount: totalAmount,
+                    items: items ? {
+                        create: validItems
+                    } : undefined
+                },
+                include: {
+                    items: true,
+                    customer: true,
+                    vehicle: true
+                }
+            });
+        });
+
+        res.json({
+            message: 'Estimate updated successfully',
+            estimate: updatedEstimate
+        });
+
+    } catch (error) {
+        console.error('Update Estimate Error:', error);
+        res.status(500).json({ message: 'Failed to update estimate' });
+    }
+});
+
+/**
+ * @route PATCH /api/estimates/:id/status
+ * @desc Update estimate status only
+ * @access Staff, Admin
+ */
+router.patch('/:id/status', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!VALID_ESTIMATE_STATUSES.includes(status)) {
+            return res.status(400).json({
+                message: `Invalid status. Allowed values: ${VALID_ESTIMATE_STATUSES.join(', ')}`
+            });
+        }
+
+        const updatedEstimate = await prisma.estimate.update({
+            where: { id },
+            data: { status },
+            include: {
+                items: true,
+                customer: { select: { firstName: true, lastName: true } },
+                vehicle: { select: { make: true, model: true, licensePlate: true } }
+            }
+        });
+
+        res.json({
+            message: 'Status updated successfully',
+            estimate: updatedEstimate
+        });
+    } catch (error) {
+        console.error('Update Status Error:', error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Estimate not found' });
+        }
+        res.status(500).json({ message: 'Failed to update status' });
+    }
+});
+
+/**
+ * @route DELETE /api/estimates/:id
+ * @desc Delete an estimate
+ * @access Staff, Admin
+ */
+router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check status first - maybe restrict deleting APPROVED estimates? 
+        // For now, allow deleting any.
+
+        await prisma.estimate.delete({
+            where: { id }
+        });
+
+        res.json({ message: 'Estimate deleted successfully' });
+    } catch (error) {
+        console.error('Delete Estimate Error:', error);
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Estimate not found' });
+        }
+        res.status(500).json({ message: 'Failed to delete estimate' });
     }
 });
 

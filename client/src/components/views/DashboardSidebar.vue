@@ -136,10 +136,9 @@ const navigationItems = [
                 description: 'Create a quote for approval',
             },
             {
-                title: 'Pending Approval',
+                title: 'Your Estimates',
                 url: '/dashboard/estimates',
-                description: 'Quotes waiting for customer approval',
-                comingSoon: true
+                description: 'View all estimates',
             }
         ]
       },

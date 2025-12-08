@@ -1,30 +1,20 @@
-<script setup lang="ts">
+<script setup>
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { History, Plus, Receipt } from 'lucide-vue-next'
-
-type ServiceRecord = {
-  id: string
-  date: string
-  vehicleId: string
-  vehicleName: string
-  totalAmount: number
-  paymentStatus: 'Paid' | 'Outstanding' | 'Partial'
-}
-
-const props = defineProps<{
-  serviceHistory: ServiceRecord[]
-}>()
-
-const emit = defineEmits<{
-  startServiceOrder: []
-  viewReceipt: [serviceId: string]
-}>()
-
 import formatDate from '@/utils/formatDate'
 
-const formatCurrency = (amount: number) => {
+defineProps({
+  serviceHistory: {
+    type: Array,
+    required: true
+  }
+})
+
+const emit = defineEmits(['startServiceOrder', 'viewReceipt'])
+
+const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP',
