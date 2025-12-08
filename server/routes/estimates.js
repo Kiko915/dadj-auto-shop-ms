@@ -30,11 +30,89 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             items
         } = req.body;
 
-        // Basic Validation
+        // Extended Validation
+        const validStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'DECLINED', 'EXPIRED'];
+        if (status && !validStatuses.includes(status)) {
+            return res.status(400).json({
+                message: `Invalid status. Allowed values: ${validStatuses.join(', ')}`,
+                error: 'INVALID_STATUS'
+            });
+        }
+
         if (!customerId || !vehicleId || !items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({
                 message: 'Missing required fields: customerId, vehicleId, and items are required',
                 error: 'MISSING_FIELDS'
+            });
+        }
+
+        // Validate Totals
+        const totals = { laborTotal, partsTotal, totalAmount };
+        for (const [key, value] of Object.entries(totals)) {
+            if (value !== undefined && (typeof value !== 'number' || value < 0)) {
+                return res.status(400).json({
+                    message: `Invalid ${key}: must be a non-negative number`,
+                    error: 'INVALID_TOTAL'
+                });
+            }
+        }
+
+        // Validate and Parse Items
+        const validItems = [];
+        for (const [index, item] of items.entries()) {
+            if (!item || typeof item !== 'object') {
+                return res.status(400).json({
+                    message: `Invalid item at index ${index}`,
+                    error: 'INVALID_ITEM'
+                });
+            }
+
+            const { type, name, description } = item;
+
+            // Parse numbers explicitly to avoid NaN
+            const quantity = Number.parseInt(item.quantity, 10);
+            const price = Number.parseFloat(item.price);
+            const total = Number.parseFloat(item.total);
+            const inventoryItemId = item.inventoryItemId ? Number.parseInt(item.inventoryItemId, 10) : null;
+
+            if (!type || !name) {
+                return res.status(400).json({
+                    message: `Item at index ${index} missing required fields (type, name)`,
+                    error: 'INVALID_ITEM_FIELDS'
+                });
+            }
+
+            // Validate parsed numbers
+            if (!Number.isFinite(price) || price < 0) {
+                return res.status(400).json({
+                    message: `Item at index ${index} has invalid price: must be non-negative number`,
+                    error: 'INVALID_ITEM_PRICE'
+                });
+            }
+
+            // Quantity must be absolute integer >= 1
+            if (!Number.isInteger(quantity) || quantity <= 0) {
+                return res.status(400).json({
+                    message: `Item at index ${index} has invalid quantity: must be a positive integer`,
+                    error: 'INVALID_ITEM_QUANTITY'
+                });
+            }
+
+            if (inventoryItemId !== null && !Number.isInteger(inventoryItemId)) {
+                return res.status(400).json({
+                    message: `Item at index ${index} has invalid inventoryItemId`,
+                    error: 'INVALID_INVENTORY_ID'
+                });
+            }
+
+            validItems.push({
+                type,
+                name,
+                description: description || null,
+                quantity,
+                price,
+                total: Number.isFinite(total) ? total : (price * quantity),
+                inventoryItemId
             });
         }
 
@@ -49,15 +127,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 partsTotal: partsTotal || 0,
                 totalAmount: totalAmount || 0,
                 items: {
-                    create: items.map(item => ({
-                        type: item.type, // PART or LABOR
-                        name: item.name,
-                        description: item.description || null,
-                        quantity: parseInt(item.quantity) || 1,
-                        price: parseFloat(item.price) || 0,
-                        total: parseFloat(item.total) || 0,
-                        inventoryItemId: item.inventoryItemId ? parseInt(item.inventoryItemId) : null
-                    }))
+                    create: validItems
                 }
             },
             include: {

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { getInventory } from '@/api/inventory'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -98,11 +99,45 @@ const selectPart = (part) => {
 }
 
 const addItem = () => {
-  if (!newItem.value.name || newItem.value.price < 0) return
+  // Validation Checks
+  if (!newItem.value.name) {
+    toast.error('Item name is required.')
+    return
+  }
+
+  const qty = Number(newItem.value.quantity)
+  const price = Number(newItem.value.price)
+
+  if (isNaN(qty) || qty <= 0) {
+    const label = newItem.value.type === 'LABOR' ? 'Hours' : 'Quantity'
+    toast.error(`${label} must be greater than 0.`)
+    return
+  }
+
+  // Price validation: must be > 0 for parts, non-negative for others
+  if (newItem.value.type === 'PART' && (isNaN(price) || price <= 0)) {
+    toast.error('Price must be greater than 0 for parts.')
+    return
+  }
+  
+  if (isNaN(price) || price < 0) {
+    toast.error('Price cannot be negative.')
+    return
+  }
+
+  // Stock validation for parts
+  if (newItem.value.type === 'PART' && newItem.value.stock !== null) {
+      if (qty > newItem.value.stock) {
+          toast.error(`Insufficient stock. Only ${newItem.value.stock} available.`)
+          return
+      }
+  }
 
   const updatedItems = [...props.items, {
     ...newItem.value,
-    total: newItem.value.quantity * newItem.value.price
+    quantity: qty, // Ensure we store number
+    price: price, // Ensure we store number
+    total: qty * price
   }]
   
   emit('update:items', updatedItems)

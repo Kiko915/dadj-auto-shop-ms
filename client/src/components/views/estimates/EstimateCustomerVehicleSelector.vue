@@ -49,13 +49,16 @@ const isLoadingVehicles = ref(false)
 
 // --- Watchers ---
 
-// If customer is cleared externally (e.g. from parent), reset local state
-watch(() => props.customer, (newVal) => {
+// If customer is set externally (restored) or cleared, update local state
+watch(() => props.customer, async (newVal) => {
     if (!newVal) {
         customerSearch.value = ''
         vehicles.value = []
+    } else {
+        // Customer restored or updated from parent -> Fetch vehicles
+        await fetchVehicles(newVal.id)
     }
-})
+}, { immediate: true })
 
 // --- Helpers ---
 
@@ -64,6 +67,30 @@ const getInitials = (firstName, lastName) => {
 }
 
 // --- Actions ---
+
+const fetchVehicles = async (customerId) => {
+    isLoadingVehicles.value = true
+    vehicles.value = []
+    try {
+        // Fetch up to 100 vehicles to ensure we get them all for the dropdown
+        const response = await getCustomerVehicles(customerId, { pageSize: 100 })
+        
+        if (Array.isArray(response)) {
+            vehicles.value = response
+        } else if (response.vehicles) {
+             vehicles.value = response.vehicles
+        } else if (response.items) {
+              vehicles.value = response.items
+        } else {
+            vehicles.value = []
+        }
+    } catch (error) {
+        console.error('Failed to fetch vehicles', error)
+        vehicles.value = []
+    } finally {
+        isLoadingVehicles.value = false
+    }
+}
 
 const handleCustomerSearch = (e) => {
   const query = e.target.value
@@ -100,34 +127,14 @@ const selectCustomer = async (selectedCustomer) => {
     customerSearch.value = '' 
     isCustomerDropdownOpen.value = false
     
-    // 3. Reset Vehicle
+    // 3. Reset Vehicle (Only if we are manually selecting a NEW customer)
+    // If the prop update triggers the watcher, we don't want to double fetch, 
+    // but the emit above will trigger the watcher. 
+    // The watcher handles the fetching.
+    
     emit('update:vehicleId', '')
-    vehicles.value = []
-    isLoadingVehicles.value = true
-  
-  // 4. Fetch Vehicles
-  try {
-    const response = await getCustomerVehicles(selectedCustomer.id)
     
-    if (Array.isArray(response)) {
-        vehicles.value = response
-    } else if (response.vehicles) {
-         vehicles.value = response.vehicles
-    } else if (response.items) {
-          vehicles.value = response.items
-    } else {
-        vehicles.value = []
-    }
-    
-    // Auto-select if only one vehicle
-    if (vehicles.value.length === 1) {
-      emit('update:vehicleId', vehicles.value[0].id)
-    }
-  } catch (error) {
-    console.error('Failed to fetch vehicles', error)
-  } finally {
-    isLoadingVehicles.value = false
-  }
+    // Note: The watcher on props.customer will trigger fetchVehicles
 }
 
 const clearCustomer = () => {
@@ -211,9 +218,15 @@ const getSelectedVehicle = () => {
                     </div>
                 </div>
                 
-                <div class="space-y-1 text-sm text-muted-foreground pl-1">
-                    <div class="flex items-center gap-2"><div class="w-1 h-1 rounded-full bg-primary"></div> {{ customer.email }}</div>
-                    <div class="flex items-center gap-2"><div class="w-1 h-1 rounded-full bg-primary"></div> {{ customer.phoneNumber }}</div>
+                <div class="space-y-1 text-sm text-muted-foreground pl-1 overflow-hidden">
+                    <div class="flex items-center gap-2" :title="customer.email">
+                        <div class="w-1 h-1 rounded-full bg-primary flex-shrink-0"></div> 
+                        <span class="truncate">{{ customer.email }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-1 h-1 rounded-full bg-primary flex-shrink-0"></div> 
+                        <span class="truncate">{{ customer.phoneNumber }}</span>
+                    </div>
                 </div>
             </div>
 

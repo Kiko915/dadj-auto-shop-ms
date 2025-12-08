@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createEstimate } from '@/api/estimates'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { 
   FilePlus, 
@@ -48,6 +49,14 @@ const saveEstimate = async (status = 'PENDING') => {
 
   isSubmitting.value = true
   try {
+    // Validate totals match
+    const calculatedTotal = items.value.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Allow for small floating point differences
+    if (Math.abs(calculatedTotal - (partsTotal.value + laborTotal.value)) > 0.01) {
+      toast.error('Calculation Error: Totals do not match. Please refresh and try again.')
+      return
+    }
+
     const payload = {
       customerId: selectedCustomer.value.id,
       vehicleId: selectedVehicleId.value,
@@ -68,14 +77,53 @@ const saveEstimate = async (status = 'PENDING') => {
     }
 
     await createEstimate(payload)
+    toast.success('Estimate created successfully')
+    
+    // Clear draft on success
+    localStorage.removeItem(STORAGE_KEY)
+    
     router.push('/dashboard/estimates') // Redirect to list
   } catch (error) {
     console.error('Failed to create estimate', error)
-    // Could show toast error here
+    toast.error(error.response?.data?.message || 'Failed to create estimate')
   } finally {
     isSubmitting.value = false
   }
 }
+
+// --- Auto-Save Logic ---
+const STORAGE_KEY = 'estimate_draft'
+
+const saveDraftToStorage = () => {
+    const draft = {
+        customer: selectedCustomer.value,
+        vehicleId: selectedVehicleId.value,
+        items: items.value,
+        expiryDate: expiryDate.value
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+}
+
+watch([selectedCustomer, selectedVehicleId, items, expiryDate], () => {
+    saveDraftToStorage()
+}, { deep: true })
+
+onMounted(() => {
+    const savedDraft = localStorage.getItem(STORAGE_KEY)
+    if (savedDraft) {
+        try {
+            const parsed = JSON.parse(savedDraft)
+            if (parsed.customer) selectedCustomer.value = parsed.customer
+            if (parsed.vehicleId) selectedVehicleId.value = parsed.vehicleId
+            if (parsed.items) items.value = parsed.items
+            if (parsed.expiryDate) expiryDate.value = parsed.expiryDate
+            
+            toast.info('Draft restored from previous session')
+        } catch (e) {
+            console.error('Failed to parse draft', e)
+        }
+    }
+})
 </script>
 
 <template>
