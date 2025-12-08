@@ -150,10 +150,14 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             });
         }
 
-        // Generate Custom ID
+        // Generate Custom ID with sequential counter
         const year = new Date().getFullYear();
-        const random = Math.floor(1000 + Math.random() * 9000);
-        const customId = `EST-${year}-${random}`;
+        const count = await prisma.estimate.count({
+            where: {
+                id: { startsWith: `EST-${year}-` }
+            }
+        });
+        const customId = `EST-${year}-${String(count + 1).padStart(6, '0')}`;
 
         // Create the Estimate and Items in a transaction (nested write)
         const newEstimate = await prisma.estimate.create({
@@ -362,10 +366,31 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
         // Validate items if provided
         let validItems = [];
         if (items && Array.isArray(items)) {
-            for (const item of items) {
+            for (const [index, item] of items.entries()) {
+                if (!item.type || !item.name) {
+                    return res.status(400).json({
+                        message: `Item at index ${index} missing required fields (type, name)`,
+                        error: 'INVALID_ITEM_FIELDS'
+                    });
+                }
+
                 const quantity = Number.parseInt(item.quantity, 10);
                 const price = Number.parseFloat(item.price);
                 const total = Number.parseFloat(item.total);
+
+                if (!Number.isFinite(price) || price < 0) {
+                    return res.status(400).json({
+                        message: `Item at index ${index} has invalid price`,
+                        error: 'INVALID_ITEM_PRICE'
+                    });
+                }
+
+                if (!Number.isInteger(quantity) || quantity <= 0) {
+                    return res.status(400).json({
+                        message: `Item at index ${index} has invalid quantity`,
+                        error: 'INVALID_ITEM_QUANTITY'
+                    });
+                }
 
                 validItems.push({
                     type: item.type,
@@ -396,9 +421,9 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                     vehicleId: vehicleId || undefined,
                     status: status || undefined,
                     expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-                    laborTotal: laborTotal,
-                    partsTotal: partsTotal,
-                    totalAmount: totalAmount,
+                    laborTotal: laborTotal ?? undefined,
+                    partsTotal: partsTotal ?? undefined,
+                    totalAmount: totalAmount ?? undefined,
                     items: items ? {
                         create: validItems
                     } : undefined

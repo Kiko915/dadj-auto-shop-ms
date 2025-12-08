@@ -57,8 +57,8 @@ const formatCurrency = (amount) => {
             </div>
             <div class="text-right">
                 <div class="font-semibold text-gray-900">DADJ Auto Shop</div>
-                <p class="text-sm text-gray-500">123 Service Road, Auto City</p>
-                <p class="text-sm text-gray-500">contact@dadjautoshop.com</p>
+                <p class="text-sm text-gray-500">St. John Village, Brgy Bungkol, Liliw Laguna</p>
+                <p class="text-sm text-gray-500">09054050454 - Jerry Arce ( Facebook )</p>
             </div>
         </div>
 

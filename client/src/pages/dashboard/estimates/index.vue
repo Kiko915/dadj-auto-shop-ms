@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Plus, Search, FileText, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -136,10 +136,16 @@ const handleSearch = () => {
 }
 
 // Debounce search
-let searchTimeout: ReturnType<typeof setTimeout>
+// Debounce search
+let searchTimeout: ReturnType<typeof setTimeout> | undefined
+
 watch(search, () => {
-  clearTimeout(searchTimeout)
+  if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(handleSearch, 500)
+})
+
+onUnmounted(() => {
+  if (searchTimeout) clearTimeout(searchTimeout)
 })
 
 watch(statusFilter, (newStatus) => {
@@ -216,8 +222,8 @@ const handleDownloadPDF = async (id: string) => {
         // Wait for DOM to render the hidden component
         await nextTick()
         
-        // Small delay to ensure styles are fully applied
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Wait for styles/layout to apply (double rAF ensures next paint frame)
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
         const element = document.getElementById('temp-estimate-pdf')
         if (!element) throw new Error('Document element not found')
@@ -299,7 +305,7 @@ onMounted(fetchData)
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Estimates</h1>
-        <p class="text-muted-foreground">create and manage customer estimates.</p>
+        <p class="text-muted-foreground">Create and manage customer estimates.</p>
       </div>
       <Button @click="navigateToNew">
         <Plus class="mr-2 h-4 w-4" />
