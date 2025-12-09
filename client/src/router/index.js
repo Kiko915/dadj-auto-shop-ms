@@ -76,9 +76,19 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/inventory/Inventory.vue'),
         },
         {
+          path: 'estimates',
+          name: 'estimates',
+          component: () => import('@/pages/dashboard/estimates/index.vue'),
+        },
+        {
           path: 'estimates/new',
           name: 'new-estimate',
           component: () => import('@/pages/dashboard/estimates/new.vue'),
+        },
+        {
+          path: 'estimates/:id',
+          name: 'estimate-details',
+          component: () => import('@/pages/dashboard/estimates/[id].vue'),
         }
       ]
     },
