@@ -3,6 +3,8 @@
 // Load environment variables immediately (ESM compatible way)
 import 'dotenv/config';
 
+import * as Sentry from '@sentry/node';
+
 import express from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js'; // Note the .js extension is often required for ESM
@@ -53,6 +55,13 @@ app.get('/', (req, res) => {
     res.send({ message: 'Express server is running and secure!' });
 });
 
+// Optional: Add this to test Sentry
+app.get("/debug-sentry", function mainHandler(req, res) {
+    throw new Error("My first Sentry error!");
+});
+
+// The error handler must be before any other error middleware and after all controllers
+Sentry.setupExpressErrorHandler(app);
 
 // --- Server Start ---
 
