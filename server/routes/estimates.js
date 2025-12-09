@@ -363,10 +363,40 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             return res.status(404).json({ message: 'Estimate not found' });
         }
 
-        // Validate items if provided
+        if (status && !VALID_ESTIMATE_STATUSES.includes(status)) {
+            return res.status(400).json({
+                message: `Invalid status. Allowed values: ${VALID_ESTIMATE_STATUSES.join(', ')}`,
+                error: 'INVALID_STATUS'
+            });
+        }
+
+        const totals = { laborTotal, partsTotal, totalAmount };
+        for (const [key, value] of Object.entries(totals)) {
+            if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+                return res.status(400).json({
+                    message: `Invalid ${key}: must be a non-negative number`,
+                    error: 'INVALID_TOTAL'
+                });
+            }
+        }
+
         let validItems = [];
-        if (items && Array.isArray(items)) {
+        if (items) {
+            if (!Array.isArray(items)) {
+                return res.status(400).json({
+                    message: 'Items must be an array',
+                    error: 'INVALID_ITEMS_FORMAT'
+                });
+            }
+
             for (const [index, item] of items.entries()) {
+                if (!item || typeof item !== 'object') {
+                    return res.status(400).json({
+                        message: `Item at index ${index} is invalid`,
+                        error: 'INVALID_ITEM'
+                    });
+                }
+
                 if (!item.type || !item.name) {
                     return res.status(400).json({
                         message: `Item at index ${index} missing required fields (type, name)`,
@@ -377,6 +407,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 const quantity = Number.parseInt(item.quantity, 10);
                 const price = Number.parseFloat(item.price);
                 const total = Number.parseFloat(item.total);
+                const inventoryItemId = item.inventoryItemId ? Number.parseInt(item.inventoryItemId, 10) : null;
 
                 if (!Number.isFinite(price) || price < 0) {
                     return res.status(400).json({
@@ -392,6 +423,13 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                     });
                 }
 
+                if (item.inventoryItemId && !Number.isInteger(inventoryItemId)) {
+                    return res.status(400).json({
+                        message: `Item at index ${index} has invalid inventoryItemId`,
+                        error: 'INVALID_INVENTORY_ID'
+                    });
+                }
+
                 validItems.push({
                     type: item.type,
                     name: item.name,
@@ -399,7 +437,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                     quantity,
                     price,
                     total: Number.isFinite(total) ? total : (price * quantity),
-                    inventoryItemId: item.inventoryItemId ? Number.parseInt(item.inventoryItemId, 10) : null
+                    inventoryItemId
                 });
             }
         }
