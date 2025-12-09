@@ -150,40 +150,63 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             });
         }
 
-        // Generate Custom ID with sequential counter
-        const year = new Date().getFullYear();
-        const count = await prisma.estimate.count({
-            where: {
-                id: { startsWith: `EST-${year}-` }
-            }
-        });
-        const customId = `EST-${year}-${String(count + 1).padStart(6, '0')}`;
+        // Generate Custom ID and Create Estimate with Retry Logic (to handle race conditions)
+        let newEstimate;
+        const maxRetries = 3;
 
-        // Create the Estimate and Items in a transaction (nested write)
-        const newEstimate = await prisma.estimate.create({
-            data: {
-                id: customId,
-                customerId,
-                vehicleId,
-                status: status || 'PENDING',
-                expiryDate: validExpiryDate,
-                laborTotal: laborTotal || 0,
-                partsTotal: partsTotal || 0,
-                totalAmount: totalAmount || 0,
-                items: {
-                    create: validItems
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // Generate Custom ID with sequential counter
+                const year = new Date().getFullYear();
+                const count = await prisma.estimate.count({
+                    where: {
+                        id: { startsWith: `EST-${year}-` }
+                    }
+                });
+                const customId = `EST-${year}-${String(count + 1).padStart(6, '0')}`;
+
+                // Create the Estimate
+                newEstimate = await prisma.estimate.create({
+                    data: {
+                        id: customId,
+                        customerId,
+                        vehicleId,
+                        status: status || 'PENDING',
+                        expiryDate: validExpiryDate,
+                        laborTotal: laborTotal || 0,
+                        partsTotal: partsTotal || 0,
+                        totalAmount: totalAmount || 0,
+                        items: {
+                            create: validItems
+                        }
+                    },
+                    include: {
+                        items: true,
+                        customer: {
+                            select: { firstName: true, lastName: true }
+                        },
+                        vehicle: {
+                            select: { make: true, model: true, licensePlate: true }
+                        }
+                    }
+                });
+
+                // If successful, break the loop
+                break;
+
+            } catch (error) {
+                // Check for Unique Constraint Violation (P2002)
+                if (error.code === 'P2002' && attempt < maxRetries - 1) {
+                    console.warn(`ID collision detected (attempt ${attempt + 1}), retrying...`);
+                    // Exponential backoff: 50ms, 100ms, 200ms
+                    const delay = Math.pow(2, attempt) * 50;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
                 }
-            },
-            include: {
-                items: true,
-                customer: {
-                    select: { firstName: true, lastName: true }
-                },
-                vehicle: {
-                    select: { make: true, model: true, licensePlate: true }
-                }
+                // If other error or max retries reached, throw
+                throw error;
             }
-        });
+        }
 
         res.status(201).json({
             message: 'Estimate created successfully',
@@ -442,6 +465,19 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             }
         }
 
+        let validExpiryDate;
+        if (expiryDate) {
+            const date = new Date(expiryDate);
+            if (date instanceof Date && !isNaN(date.getTime())) {
+                validExpiryDate = date;
+            } else {
+                return res.status(400).json({
+                    message: 'Invalid expiry date',
+                    error: 'INVALID_DATE'
+                });
+            }
+        }
+
         // Transaction to update estimate and replace items
         const updatedEstimate = await prisma.$transaction(async (prisma) => {
             // 1. Delete existing items
@@ -458,7 +494,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                     customerId: customerId || undefined,
                     vehicleId: vehicleId || undefined,
                     status: status || undefined,
-                    expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+                    expiryDate: validExpiryDate, // Use the validated date or undefined if not provided
                     laborTotal: laborTotal ?? undefined,
                     partsTotal: partsTotal ?? undefined,
                     totalAmount: totalAmount ?? undefined,

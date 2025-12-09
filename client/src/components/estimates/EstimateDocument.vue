@@ -50,6 +50,10 @@ const formattedEstimateId = computed(() => {
     const id = props.estimate.id
     return id.startsWith('EST-') ? id : id.slice(-8).toUpperCase()
 })
+
+const items = computed(() => {
+    return props.estimate.items || []
+})
 </script>
 
 <template>
@@ -111,7 +115,7 @@ const formattedEstimateId = computed(() => {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="item in estimate.items" :key="item.id">
+                    <TableRow v-for="item in items" :key="item.id">
                         <TableCell>
                             <div class="font-medium">{{ item.name }}</div>
                             <div v-if="item.description" class="text-sm text-muted-foreground">{{ item.description }}</div>
