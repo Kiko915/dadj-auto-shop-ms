@@ -156,14 +156,22 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                // Generate Custom ID with sequential counter
+                // Generate Custom ID with robust SQL counting
                 const year = new Date().getFullYear();
-                const count = await prisma.estimate.count({
-                    where: {
-                        id: { startsWith: `EST-${year}-` }
-                    }
-                });
-                const customId = `EST-${year}-${String(count + 1).padStart(6, '0')}`;
+                const prefix = `EST-${year}-`;
+
+                // Get the maximum existing suffix for the current year
+                // We cast the substring (digits after 'EST-YYYY-') to integer to find the true max
+                // Postgres substring index is 1-based: 'EST-YYYY-' is 9 chars, so start at 10
+                const result = await prisma.$queryRaw`
+                    SELECT MAX(CAST(SUBSTRING(estimate_id, 10, 6) AS INTEGER)) as "maxSeq"
+                    FROM "estimates"
+                    WHERE "estimate_id" LIKE ${prefix + '%'}
+                `;
+
+                const maxSeq = result[0]?.maxSeq || 0;
+                const nextSeq = maxSeq + 1;
+                const customId = `${prefix}${String(nextSeq).padStart(6, '0')}`;
 
                 // Create the Estimate
                 newEstimate = await prisma.estimate.create({
@@ -229,7 +237,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
  */
 router.get('/stats', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const [totalEstimates, pendingEstimates, approvedEstimates, declinedEstimates, approvedRevenue] = await prisma.$transaction([
+        const [totalEstimates, pendingEstimates, approvedEstimates, declinedEstimates, approvedRevenue] = await Promise.all([
             prisma.estimate.count(),
             prisma.estimate.count({ where: { status: 'PENDING' } }),
             prisma.estimate.count({ where: { status: 'APPROVED' } }),
