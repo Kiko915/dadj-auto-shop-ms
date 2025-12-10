@@ -303,7 +303,7 @@ const formatDate = (dateString) => {
           <Button
             variant="outline"
             size="sm"
-            :disabled="currentPage === totalPages || loading"
+            :disabled="currentPage >= totalPages || loading"
             @click="$emit('page-change', currentPage + 1)"
           >
             Next

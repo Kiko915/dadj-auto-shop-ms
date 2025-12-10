@@ -31,7 +31,7 @@ const notificationsCount = ref(3)
 
 // Format user role for display
 const displayRole = computed(() => {
-  const role = authStore.userRole || 'user'
+  const role = authStore.userRole || 'staff'
   return role.charAt(0).toUpperCase() + role.slice(1)
 })
 

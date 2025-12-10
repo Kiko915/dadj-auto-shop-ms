@@ -53,10 +53,9 @@ const isDeactivating = ref(false)
 
 // Watch search query for debounce
 watch(searchQuery, (newValue) => {
-  debouncedSearchQuery.value = newValue
-  
   if (debounceTimeout) clearTimeout(debounceTimeout)
   debounceTimeout = setTimeout(() => {
+    debouncedSearchQuery.value = newValue
     currentPage.value = 1
     fetchUsers()
   }, 300)

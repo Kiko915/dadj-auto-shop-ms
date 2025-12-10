@@ -26,7 +26,7 @@ const emit = defineEmits(['edit', 'change-avatar'])
 
 // Format role for display
 const displayRole = computed(() => {
-  const role = props.user.role || 'user'
+  const role = props.user.role || 'staff'
   return role.charAt(0).toUpperCase() + role.slice(1)
 })
 

@@ -1,5 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import prisma from '../db.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import imagekit from '../config/imagekit.js';
@@ -148,21 +150,6 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
     }
 });
 
-/**
- * @route POST /api/users
- * @description Create a new user
- * @access Admin only
- * @body {string} email - User's email (required)
- * @body {string} name - User's full name (required)
- * @body {string} password - User's password (required)
- * @body {string} role - User's role: admin, staff, mechanic (required)
- * @body {boolean} isActive - Whether user is active (optional, default true)
- * @body {string} profilePicture - Profile picture URL (optional)
- */
-import crypto from 'crypto';
-import nodemailer from 'nodemailer';
-
-// ... (other imports)
 
 /**
  * @route POST /api/users

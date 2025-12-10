@@ -7,7 +7,7 @@
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true,
 ADD COLUMN     "password" TEXT NOT NULL,
-ADD COLUMN     "role" TEXT NOT NULL DEFAULT 'user';
+ADD COLUMN     "role" TEXT NOT NULL DEFAULT 'staff';
 
 -- CreateTable
 CREATE TABLE "password_resets" (

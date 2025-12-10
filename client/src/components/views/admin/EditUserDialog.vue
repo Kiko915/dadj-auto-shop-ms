@@ -104,15 +104,19 @@ const validateForm = () => {
     newErrors.email = 'Invalid email format'
   }
   
-  if (changePassword.value && formData.value.password) {
-    if (formData.value.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters'
+  if (changePassword.value) {
+    if (!formData.value.password) {
+      newErrors.password = 'Password is required'
     } else {
-      const hasLower = /[a-z]/.test(formData.value.password)
-      const hasUpper = /[A-Z]/.test(formData.value.password)
-      const hasNumber = /[0-9]/.test(formData.value.password)
-      if (!hasLower || !hasUpper || !hasNumber) {
-        newErrors.password = 'Password must contain uppercase, lowercase, and numbers'
+      if (formData.value.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters'
+      } else {
+        const hasLower = /[a-z]/.test(formData.value.password)
+        const hasUpper = /[A-Z]/.test(formData.value.password)
+        const hasNumber = /[0-9]/.test(formData.value.password)
+        if (!hasLower || !hasUpper || !hasNumber) {
+          newErrors.password = 'Password must contain uppercase, lowercase, and numbers'
+        }
       }
     }
   }
@@ -174,7 +178,13 @@ const uploadToImageKit = async (file) => {
     uploadFormData.append('token', token)
     uploadFormData.append('expire', expire)
     uploadFormData.append('signature', signature)
-    uploadFormData.append('publicKey', import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '')
+    const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY
+    if (!publicKey) {
+      console.error('Missing VITE_IMAGEKIT_PUBLIC_KEY in environment variables')
+      throw new Error('Image upload configuration is missing')
+    }
+
+    uploadFormData.append('publicKey', publicKey)
 
     // Upload to ImageKit
     const uploadResponse = await fetch(

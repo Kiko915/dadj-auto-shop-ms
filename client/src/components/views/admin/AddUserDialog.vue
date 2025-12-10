@@ -148,7 +148,13 @@ const uploadToImageKit = async (file) => {
     uploadFormData.append('token', token)
     uploadFormData.append('expire', expire)
     uploadFormData.append('signature', signature)
-    uploadFormData.append('publicKey', import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '')
+    const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY
+    if (!publicKey) {
+      console.error('Missing VITE_IMAGEKIT_PUBLIC_KEY in environment variables')
+      throw new Error('Image upload configuration is missing')
+    }
+
+    uploadFormData.append('publicKey', publicKey)
 
     // Upload to ImageKit
     const uploadResponse = await fetch(
