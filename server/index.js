@@ -16,6 +16,7 @@ import inventoryRoutes from './routes/inventory.js'
 import filesRoutes from './routes/files.js'
 
 import estimateRoutes from './routes/estimates.js';
+import usersRoutes from './routes/users.js';
 
 // --- Initialization ---
 const app = express();
@@ -48,22 +49,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/estimates', estimateRoutes);
 app.use('/api/files', filesRoutes);
-
-// 4. Root Route (Simple Check)
-app.get('/', (req, res) => {
-    // Use arrow functions and object shorthand
-    res.send({ message: 'Express server is running and secure!' });
-});
-
-// Optional: Add this to test Sentry
-app.get("/debug-sentry", function mainHandler(req, res) {
-    throw new Error("My first Sentry error!");
-});
-
-// The error handler must be before any other error middleware and after all controllers
-Sentry.setupExpressErrorHandler(app);
-
-// --- Server Start ---
+app.use('/api/users', usersRoutes);
 
 app.listen(PORT, () => {
     // Use template literals for cleaner console logging

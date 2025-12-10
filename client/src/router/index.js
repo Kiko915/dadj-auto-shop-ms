@@ -89,8 +89,28 @@ const router = createRouter({
           path: 'estimates/:id',
           name: 'estimate-details',
           component: () => import('@/pages/dashboard/estimates/[id].vue'),
+        },
+        // Admin routes
+        {
+          path: 'admin/users',
+          name: 'admin-users',
+          component: () => import('@/pages/dashboard/admin/users.vue'),
+          meta: { requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: 'admin/settings',
+          name: 'admin-settings',
+          component: () => import('@/pages/dashboard/admin/settings.vue'),
+          meta: { requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: 'admin/health',
+          name: 'admin-health',
+          component: () => import('@/pages/dashboard/admin/health.vue'),
+          meta: { requiresAuth: true, requiresAdmin: true }
         }
       ]
+
     },
     {
       path: '/:pathMatch(.*)*',
@@ -118,6 +138,13 @@ router.beforeEach(async (to, from, next) => {
       // Try to fetch user profile to validate token using axios
       const response = await api.get('/protected/profile')
 
+      // Check if route requires admin role
+      if (to.meta.requiresAdmin && authStore.currentUser?.role !== 'admin') {
+        console.log('🚫 Route requires admin role, redirecting to dashboard')
+        next('/dashboard')
+        return
+      }
+
       // If we get here, token is valid, proceed
       next()
     } catch (error) {
@@ -126,6 +153,7 @@ router.beforeEach(async (to, from, next) => {
       authStore.logout()
       next('/auth/login')
     }
+
   } else if (to.path.startsWith('/auth/') && authStore.isAuthenticated) {
     // User is already authenticated and trying to access any auth page
     console.log('✅ User already authenticated, redirecting to dashboard from', to.path)

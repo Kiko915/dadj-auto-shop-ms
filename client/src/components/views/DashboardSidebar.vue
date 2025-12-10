@@ -184,9 +184,25 @@ const systemItems = [
   {
     title: 'System Admin',
     icon: Settings,
-    url: '/dashboard/admin',
     description: 'Admin-only access for roles, backup, settings',
     adminOnly: true,
+    children: [
+      {
+        title: 'User Management',
+        url: '/dashboard/admin/users',
+        description: 'Manage user accounts and roles',
+      },
+      {
+        title: 'System Settings',
+        url: '/dashboard/admin/settings',
+        description: 'Configure system settings',
+      },
+      {
+        title: 'System Health',
+        url: '/dashboard/admin/health',
+        description: 'Monitor system performance and health',
+      },
+    ]
   },
   {
     title: 'My Account',
@@ -337,8 +353,56 @@ const toggleDarkMode = () => {
           <SidebarGroupContent>
             <SidebarMenu class="space-y-1 group-data-[collapsible=icon]:space-y-1">
               <template v-for="item in systemItems" :key="item.title">
+                  <!-- Collapsible System Item with Children -->
+                  <Collapsible 
+                    v-if="item.children && (!item.adminOnly || (item.adminOnly && authStore.currentUser?.role === 'admin'))" 
+                    as-child 
+                    :default-open="false" 
+                    class="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger as-child>
+                        <SidebarMenuButton :tooltip="item.title" class="cursor-pointer">
+                          <component :is="item.icon" class="w-5 h-5 mr-2" />
+                          <span class="font-medium">{{ item.title }}</span>
+                          <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent class="collapsible-content">
+                        <SidebarMenuSub class="ml-4 border-l border-border pl-2 space-y-1">
+                          <SidebarMenuSubItem v-for="child in item.children" :key="child.title">
+                            <Tooltip>
+                              <TooltipTrigger as-child>
+                                <SidebarMenuSubButton 
+                                  :as="'a'" 
+                                  :href="child.url"
+                                  @click.prevent="child.comingSoon ? null : $router.push(child.url)"
+                                  :class="[
+                                    'text-sm transition-all duration-200 rounded-md',
+                                    isActive(child.url) 
+                                      ? '!bg-primary !text-white shadow-md shadow-primary/20 hover:!bg-primary hover:shadow-lg hover:shadow-primary/30' 
+                                      : 'text-foreground/70 hover:text-foreground hover:bg-accent/50',
+                                    child.comingSoon ? 'opacity-50 cursor-not-allowed' : ''
+                                  ]"
+                                >
+                                  <span class="truncate">{{ child.title }}</span>
+                                  <span v-if="child.comingSoon" class="ml-auto text-[10px] uppercase text-muted-foreground border border-border px-1 rounded shrink-0">Soon</span>
+                                </SidebarMenuSubButton>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">
+                                <p class="font-medium">{{ child.title }}</p>
+                                <p v-if="child.description" class="text-xs text-gray-200 mt-1">{{ child.description }}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </SidebarMenuSubItem>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+
+                  <!-- Standard System Item without Children -->
                   <SidebarMenuItem 
-                    v-if="!item.adminOnly || (item.adminOnly && authStore.currentUser?.role === 'admin')"
+                    v-else-if="!item.adminOnly || (item.adminOnly && authStore.currentUser?.role === 'admin')"
                     class="group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
                   >
                     <Tooltip>

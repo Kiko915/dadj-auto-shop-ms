@@ -21,7 +21,7 @@ model User {
   email          String  @unique
   name           String?
   password       String
-  role           String  @default("user") // user, admin, mechanic
+  role           String  @default("staff") // staff, admin, mechanic
   isActive       Boolean @default(true)
   profilePicture String? // URL or path to profile picture
 

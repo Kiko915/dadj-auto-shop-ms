@@ -1,5 +1,6 @@
 // server/instrument.js
 import 'dotenv/config';
+import 'newrelic';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
