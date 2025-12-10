@@ -74,7 +74,20 @@ watch(() => props.user, (newUser) => {
 
 // Reset form when dialog closes
 watch(() => props.open, (isOpen) => {
-  if (!isOpen) {
+  if (isOpen && props.user) {
+    // Re-initialize form data when dialog opens
+    formData.value = {
+      name: props.user.name || '',
+      email: props.user.email || '',
+      password: '',
+      role: props.user.role || 'staff',
+      isActive: props.user.isActive ?? true,
+      profilePicture: props.user.profilePicture || null
+    }
+    profilePreview.value = props.user.profilePicture || null
+    changePassword.value = false
+    errors.value = {}
+  } else if (!isOpen) {
     errors.value = {}
     showPassword.value = false
     changePassword.value = false
@@ -211,6 +224,9 @@ const uploadToImageKit = async (file) => {
     toast.error('Upload failed', {
       description: 'Failed to upload image. Please try again.'
     })
+    // Reset preview on failure
+    profilePreview.value = props.user?.profilePicture || null
+    formData.value.profilePicture = props.user?.profilePicture || null
   } finally {
     isUploading.value = false
   }

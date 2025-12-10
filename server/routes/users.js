@@ -16,15 +16,33 @@ const router = express.Router();
 router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
         const {
-            page = 1,
-            pageSize = 10,
+            page,
+            pageSize,
             search = '',
             role = 'All',
             status = 'All'
         } = req.query;
 
-        const pageNum = parseInt(page);
-        const size = parseInt(pageSize);
+        // Validate page
+        let pageNum = 1;
+        if (page !== undefined) {
+            const parsedPage = parseInt(page, 10);
+            if (isNaN(parsedPage) || parsedPage < 1) {
+                return res.status(400).json({ error: 'Invalid pagination parameters: page must be a positive integer' });
+            }
+            pageNum = parsedPage;
+        }
+
+        // Validate pageSize
+        let size = 10;
+        if (pageSize !== undefined) {
+            const parsedSize = parseInt(pageSize, 10);
+            if (isNaN(parsedSize) || parsedSize < 1) {
+                return res.status(400).json({ error: 'Invalid pagination parameters: pageSize must be a positive integer' });
+            }
+            size = Math.min(parsedSize, 100); // Clamp max size to 100
+        }
+
         const skip = (pageNum - 1) * size;
 
         // Build filter conditions
