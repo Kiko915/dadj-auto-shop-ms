@@ -11,7 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userName = ref(localStorage.getItem('userName'))
   const profilePicture = ref(localStorage.getItem('profilePicture'))
   const createdAt = ref(localStorage.getItem('createdAt'))
-  
+
   // Address fields
   const region = ref(localStorage.getItem('region'))
   const province = ref(localStorage.getItem('province'))
@@ -19,7 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
   const barangay = ref(localStorage.getItem('barangay'))
   const street = ref(localStorage.getItem('street'))
   const country = ref(localStorage.getItem('country'))
-  
+
   // Getters
   const isAuthenticated = computed(() => !!token.value)
   const currentUser = computed(() => ({
@@ -36,12 +36,12 @@ export const useAuthStore = defineStore('auth', () => {
     country: country.value,
     isLoggedIn: isAuthenticated.value
   }))
-  
+
   // Actions
   function login(authToken, user) {
     token.value = authToken
     userEmail.value = user.email
-    userRole.value = user.role || 'user'
+    userRole.value = user.role || 'staff'
     userName.value = user.name || null
     profilePicture.value = user.profilePicture || null
     createdAt.value = user.createdAt || null
@@ -51,10 +51,10 @@ export const useAuthStore = defineStore('auth', () => {
     barangay.value = user.barangay || null
     street.value = user.street || null
     country.value = user.country || 'Philippines'
-    
+
     localStorage.setItem('authToken', authToken)
     localStorage.setItem('userEmail', user.email)
-    localStorage.setItem('userRole', user.role || 'user')
+    localStorage.setItem('userRole', user.role || 'staff')
     if (user.name) localStorage.setItem('userName', user.name)
     if (user.profilePicture) localStorage.setItem('profilePicture', user.profilePicture)
     if (user.createdAt) localStorage.setItem('createdAt', user.createdAt)
@@ -65,7 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.street) localStorage.setItem('street', user.street)
     if (user.country) localStorage.setItem('country', user.country)
   }
-  
+
   async function logout() {
     // Call server logout if token exists
     if (token.value) {
@@ -77,7 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Continue with client-side logout even if server fails
       }
     }
-    
+
     // Clear client-side data
     token.value = null
     userEmail.value = null
@@ -91,7 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
     barangay.value = null
     street.value = null
     country.value = null
-    
+
     localStorage.removeItem('authToken')
     localStorage.removeItem('userEmail')
     localStorage.removeItem('userRole')
@@ -112,48 +112,48 @@ export const useAuthStore = defineStore('auth', () => {
       userName.value = userData.name
       localStorage.setItem('userName', userData.name)
     }
-    
+
     if (userData.region !== undefined) {
       region.value = userData.region
       if (userData.region) localStorage.setItem('region', userData.region)
       else localStorage.removeItem('region')
     }
-    
+
     if (userData.province !== undefined) {
       province.value = userData.province
       if (userData.province) localStorage.setItem('province', userData.province)
       else localStorage.removeItem('province')
     }
-    
+
     if (userData.city !== undefined) {
       city.value = userData.city
       if (userData.city) localStorage.setItem('city', userData.city)
       else localStorage.removeItem('city')
     }
-    
+
     if (userData.barangay !== undefined) {
       barangay.value = userData.barangay
       if (userData.barangay) localStorage.setItem('barangay', userData.barangay)
       else localStorage.removeItem('barangay')
     }
-    
+
     if (userData.street !== undefined) {
       street.value = userData.street
       if (userData.street) localStorage.setItem('street', userData.street)
       else localStorage.removeItem('street')
     }
-    
+
     if (userData.profilePicture !== undefined) {
       profilePicture.value = userData.profilePicture
       if (userData.profilePicture) localStorage.setItem('profilePicture', userData.profilePicture)
       else localStorage.removeItem('profilePicture')
     }
   }
-  
+
   function getAuthHeader() {
     return token.value ? { Authorization: `Bearer ${token.value}` } : {}
   }
-  
+
   return {
     // State
     token,

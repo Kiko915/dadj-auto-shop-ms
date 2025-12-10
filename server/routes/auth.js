@@ -46,6 +46,14 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid Email or Password' });
         }
 
+        // Check if user is active - only check this AFTER verifying credentials
+        if (!user.isActive) {
+            return res.status(403).json({
+                message: 'Account is deactivated. Please contact administrator.',
+                error: 'ACCOUNT_DEACTIVATED'
+            });
+        }
+
         // 4. Generate JWT token
         const token = jwt.sign(
             { userId: user.id },
