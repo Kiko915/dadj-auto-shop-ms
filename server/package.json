@@ -5,8 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js",
-    "start": "node index.js",
+    "dev": "nodemon --import ./instrument.js index.js",
+    "start": "node --import ./instrument.js index.js",
     "prisma:migrate": "npx prisma migrate dev --name",
     "prisma:generate": "npx prisma generate",
     "postinstall": "npm run prisma:generate"
@@ -23,6 +23,8 @@
   "dependencies": {
     "@prisma/adapter-neon": "^6.17.1",
     "@prisma/client": "^6.17.1",
+    "@sentry/node": "^10.29.0",
+    "@sentry/profiling-node": "^10.29.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
