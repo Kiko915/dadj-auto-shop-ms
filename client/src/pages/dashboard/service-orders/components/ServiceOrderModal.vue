@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { 
     Calendar, 
     User, 
@@ -11,9 +12,11 @@ import {
     Hash,
     Archive,
     CheckCircle,
-    Plus // Used in Attachments tab
+    Plus,
+    X,
+    AlertTriangle // Used in Attachments tab
 } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import DatePicker from '@/components/ui/date-picker/DatePicker.vue'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { getServiceOrder, updateServiceOrder } from '@/api/serviceOrders'
+import { getServiceOrder, updateServiceOrder, deleteServiceOrder } from '@/api/serviceOrders'
 import { getMechanics } from '@/api/users'
 import { formatDate, formatCurrency, getInitials, getStatusVariant, COLUMNS } from '../utils'
 import ServiceOrderLabor from './ServiceOrderLabor.vue'
@@ -51,6 +54,30 @@ const emit = defineEmits(['update:open', 'order-updated'])
 const loading = ref(false)
 const order = ref<any>(null) // Using any for now to handle expanded relations not in list type
 const mechanics = ref<any[]>([])
+
+const isArchiving = ref(false)
+const showArchiveConfirm = ref(false)
+
+const handleArchive = () => {
+    if (!order.value?.id) return
+    showArchiveConfirm.value = true
+}
+
+const executeArchive = async () => {
+    isArchiving.value = true
+    try {
+        await deleteServiceOrder(order.value.id)
+        toast.success('Order archived successfully')
+        emit('order-updated')
+        emit('update:open', false)
+        showArchiveConfirm.value = false
+    } catch (error) {
+        console.error('Failed to archive order', error)
+        toast.error('Failed to archive order')
+    } finally {
+        isArchiving.value = false
+    }
+}
 
 watch(() => props.orderId, async (newId) => {
     if (newId && props.open) {
@@ -452,9 +479,15 @@ const isDueSoon = (dateString: string | Date | null) => {
                         <!-- Action Buttons -->
                         <div class="mt-4 pt-4 border-t space-y-2">
                              <!-- Archive (Cancelled) -->
-                            <Button v-if="order.status === 'CANCELLED'" variant="outline" class="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shadow-sm border-dashed">
+                            <Button 
+                                v-if="order.status === 'CANCELLED'" 
+                                variant="outline" 
+                                class="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shadow-sm border-dashed"
+                                @click="handleArchive"
+                                :disabled="isArchiving"
+                            >
                                 <Archive class="h-4 w-4 mr-2" />
-                                Archive Order
+                                {{ isArchiving ? 'Archiving...' : 'Archive Order' }}
                             </Button>
 
                             <!-- Payment Actions -->
@@ -609,6 +642,27 @@ const isDueSoon = (dateString: string | Date | null) => {
                 </div>
             </div>
 
+        </DialogContent>
+    </Dialog>
+
+    <!-- Confirmation Dialog -->
+    <Dialog v-model:open="showArchiveConfirm">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2 text-destructive">
+                    <AlertTriangle class="h-5 w-5" />
+                    Archive Order
+                </DialogTitle>
+                <DialogDescription>
+                    Are you sure you want to archive this service order? This action will remove it from the active views. This cannot be undone.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter class="gap-2 sm:gap-0">
+                <Button variant="outline" @click="showArchiveConfirm = false" :disabled="isArchiving">Cancel</Button>
+                <Button variant="destructive" @click="executeArchive" :disabled="isArchiving" class="ml-2">
+                    {{ isArchiving ? 'Archiving...' : 'Yes, Archive Order' }}
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>

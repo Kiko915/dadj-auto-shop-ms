@@ -119,12 +119,12 @@ const saveAddItem = async () => {
         <div v-if="loading" class="space-y-3">
             <Skeleton class="h-12 w-full" v-for="i in 5" :key="i" />
         </div>
-        <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg bg-slate-50/50">
+        <div v-else-if="items.length === 0 && !isAddingLabor" class="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg bg-slate-50/50">
             <Wrench class="h-10 w-10 mb-2 opacity-20" />
             <p class="font-medium">No labor items</p>
             <p class="text-xs">No labor has been added to this order.</p>
         </div>
-        <div class="rounded-md border bg-white mb-4">
+        <div v-else class="rounded-md border bg-white mb-4">
             <Table>
                 <TableHeader>
                     <TableRow class="bg-slate-50 hover:bg-slate-50">

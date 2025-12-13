@@ -58,7 +58,6 @@ const addItemForm = ref({
 const partSearchQuery = ref('')
 const partSearchResults = ref<any[]>([])
 const isSearchingParts = ref(false)
-const uniquePopoverId = Math.random().toString(36).substring(7)
 const isPopoverOpen = ref(false)
 const selectedInventoryItem = ref<any>(null)
 

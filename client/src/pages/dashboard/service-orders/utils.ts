@@ -5,8 +5,11 @@ export const COLUMNS = {
     CANCELLED: 'Cancelled'
 }
 
-export const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+export const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'Invalid Date'
+    return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
 }
 
 export const formatCurrency = (value: number) => {
@@ -17,8 +20,16 @@ export const formatCurrency = (value: number) => {
     }).format(value)
 }
 
-export const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+export const getInitials = (name: string | null | undefined) => {
+    if (!name) return ''
+    return name
+        .trim()
+        .split(/\s+/)
+        .filter(part => part.length > 0)
+        .map(part => part.charAt(0))
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
 }
 
 export const isOverdue = (dateString: string | null) => {
@@ -47,4 +58,12 @@ export const getStatusVariant = (status: string) => {
         case 'CANCELLED': return 'destructive'
         default: return 'outline'
     }
+}
+
+export const formatStatus = (status: string | null | undefined): string => {
+    if (!status) return ''
+    return status
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, char => char.toUpperCase())
 }

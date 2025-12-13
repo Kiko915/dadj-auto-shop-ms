@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { Trash2, Plus, Pencil, Image as ImageIcon, AlertTriangle, AlertCircle, Info, Lock } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,6 +51,11 @@ const getSeverityConfig = (severity: string) => {
 const handleImageSelect = (event: Event) => {
     const input = event.target as HTMLInputElement
     if (input.files && input.files[0]) {
+        // Revoke existing URL to prevent memory leak
+        if (previewUrl.value && !previewUrl.value.startsWith('http')) {
+             URL.revokeObjectURL(previewUrl.value)
+        }
+        
         const file = input.files[0]
         selectedImage.value = file
         previewUrl.value = URL.createObjectURL(file)
@@ -58,9 +63,19 @@ const handleImageSelect = (event: Event) => {
 }
 
 const clearImage = () => {
+    // Revoke URL if it's a blob
+    if (previewUrl.value && !previewUrl.value.startsWith('http')) {
+        URL.revokeObjectURL(previewUrl.value)
+    }
     selectedImage.value = null
     previewUrl.value = null
 }
+
+onUnmounted(() => {
+    if (previewUrl.value && !previewUrl.value.startsWith('http')) {
+        URL.revokeObjectURL(previewUrl.value)
+    }
+})
 
 const resetForm = () => {
     formData.value = { content: '', severity: 'LOW' }

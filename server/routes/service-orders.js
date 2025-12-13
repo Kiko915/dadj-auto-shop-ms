@@ -63,7 +63,8 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
         // Date Filter
         if (dateFilter && dateFilter !== 'ALL') {
             const now = new Date();
-            const todayStart = new Date(now.setHours(0, 0, 0, 0));
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
 
             if (dateFilter === 'overdue') {
                 // Determine overdue based on estimatedCompletion
@@ -170,133 +171,171 @@ router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
  */
 router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { estimateId, mechanicId, odometer, estimatedCompletion } = req.body;
+        const { estimateId, mechanicId, odometer, estimatedCompletion, customerId, vehicleId, items, partsTotal, laborTotal, totalAmount } = req.body;
 
-        if (!estimateId) {
-            return res.status(400).json({ message: 'Estimate ID is required' });
-        }
+        let sourceData = {};
 
-        // 1. Fetch Estimate with necessary relations
-        const estimate = await prisma.estimate.findUnique({
-            where: { id: estimateId },
-            include: {
-                items: true,
-                vehicle: true
+        if (estimateId) {
+            // 1. Fetch Estimate
+            const estimate = await prisma.estimate.findUnique({
+                where: { id: estimateId },
+                include: { items: true, vehicle: true }
+            });
+
+            if (!estimate) {
+                return res.status(404).json({ message: 'Estimate not found' });
             }
-        });
 
-        if (!estimate) {
-            return res.status(404).json({ message: 'Estimate not found' });
+            sourceData = {
+                customerId: estimate.customerId,
+                vehicleId: estimate.vehicleId,
+                items: estimate.items, // EstimateItems
+                partsTotal: estimate.partsTotal,
+                laborTotal: estimate.laborTotal,
+                totalAmount: estimate.totalAmount,
+                currentMileage: estimate.vehicle.mileage || 0,
+                sourceEstimateId: estimate.id
+            };
+        } else {
+            // Direct Creation Validation
+            if (!customerId || !vehicleId || !items || items.length === 0) {
+                return res.status(400).json({ message: 'For direct orders: Customer, Vehicle, and Items are required.' });
+            }
+
+            // Fetch vehicle for mileage check
+            const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+            if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+
+            sourceData = {
+                customerId,
+                vehicleId,
+                items, // Raw items from body
+                partsTotal: partsTotal || 0,
+                laborTotal: laborTotal || 0,
+                totalAmount: totalAmount || 0,
+                currentMileage: vehicle.mileage || 0,
+                sourceEstimateId: null
+            };
         }
 
         // 2. Validate Mechanic if provided
         if (mechanicId) {
-            const mechanic = await prisma.user.findUnique({
-                where: { id: mechanicId }
-            });
+            const mechanic = await prisma.user.findUnique({ where: { id: mechanicId } });
             if (!mechanic || mechanic.role !== 'mechanic') {
                 return res.status(400).json({ message: 'Invalid mechanic ID' });
             }
         }
 
-        // 3. Generate Custom Service Order ID: SO-YYYY-XXXXXX
-        const year = new Date().getFullYear();
-        const prefix = `SO-${year}-`;
+        let serviceOrder;
+        let retries = 3;
 
-        // Find max sequence for current year
-        const result = await prisma.$queryRaw`
-            SELECT MAX(CAST(SUBSTRING(order_id, 9, 6) AS INTEGER)) as "maxSeq"
-            FROM "service_orders"
-            WHERE "order_id" LIKE ${prefix + '%'}
-        `;
+        while (retries > 0) {
+            try {
+                // 3. Generate Custom Service Order ID: SO-YYYY-XXXXXX
+                const year = new Date().getFullYear();
+                const prefix = `SO-${year}-`;
 
-        const maxSeq = result[0]?.maxSeq || 0;
-        const nextSeq = maxSeq + 1;
-        const customId = `${prefix}${String(nextSeq).padStart(6, '0')}`;
+                // Find max sequence for current year
+                const result = await prisma.$queryRaw`
+                    SELECT MAX(CAST(SUBSTRING(order_id, 9, 6) AS INTEGER)) as "maxSeq"
+                    FROM "service_orders"
+                    WHERE "order_id" LIKE ${prefix + '%'}
+                `;
 
-        // 4. Transform Estimate Items to Service Order Items
-        // Note: EstimateItem and ServiceOrderItem have slightly different structures (ServiceOrderItem references InventoryItem via Int ID)
-        // We match them mapping fields.
-        const orderItems = estimate.items.map(item => ({
-            type: item.type,
-            name: item.name,
-            description: item.description,
-            quantity: item.quantity,
-            price: item.price,
-            total: item.total,
-            inventoryItemId: item.inventoryItemId // This is Int, same as model
-        }));
+                const maxSeq = result[0]?.maxSeq || 0;
+                const nextSeq = maxSeq + 1;
+                const customId = `${prefix}${String(nextSeq).padStart(6, '0')}`;
 
-        // 5. Transaction: Create Order, Update/Verify Mileage, Update Inventory, Update Estimate Status
-        const serviceOrder = await prisma.$transaction(async (prisma) => {
-            // Update Vehicle Mileage if provided and greater than current
-            if (odometer && odometer > (estimate.vehicle.mileage || 0)) {
-                await prisma.vehicle.update({
-                    where: { id: estimate.vehicleId },
-                    data: { mileage: odometer }
-                });
-            }
+                // 4. Prepare Order Items
+                const orderItems = sourceData.items.map(item => ({
+                    type: item.type,
+                    name: item.name,
+                    description: item.description,
+                    quantity: item.quantity,
+                    price: item.price,
+                    total: item.total || (item.price * item.quantity),
+                    inventoryItemId: item.inventoryItemId
+                }));
 
-            // Inventory Check & Deduction Logic
-            let orderNotes = null;
-            let hasInsufficientStock = false;
-
-            for (const item of estimate.items) {
-                // Only check inventory for PARTS (where inventoryItemId exists)
-                if (item.inventoryItemId) {
-                    const inventoryItem = await prisma.inventoryItem.findUnique({
-                        where: { id: item.inventoryItemId }
-                    });
-
-                    if (inventoryItem) {
-                        // Check availability
-                        if (inventoryItem.quantity < item.quantity) {
-                            hasInsufficientStock = true;
-                        }
-
-                        // Deduct stock (allow negative for now, or stop at 0? 
-                        // Standard practice if we create the order is to deduct it to show the deficit)
-                        await prisma.inventoryItem.update({
-                            where: { id: item.inventoryItemId },
-                            data: { quantity: { decrement: item.quantity } }
+                // 5. Transaction
+                serviceOrder = await prisma.$transaction(async (prisma) => {
+                    // Update Vehicle Mileage
+                    if (odometer && odometer > sourceData.currentMileage) {
+                        await prisma.vehicle.update({
+                            where: { id: sourceData.vehicleId },
+                            data: { mileage: odometer }
                         });
                     }
-                }
-            }
 
-            if (hasInsufficientStock) {
-                orderNotes = "Waiting for parts";
-            }
+                    // Inventory Logic
+                    let orderNotes = null;
+                    let hasInsufficientStock = false;
 
-            // Create Service Order
-            const newOrder = await prisma.serviceOrder.create({
-                data: {
-                    id: customId,
-                    customerId: estimate.customerId,
-                    vehicleId: estimate.vehicleId,
-                    sourceEstimateId: estimate.id,
-                    mechanicId: mechanicId || null,
-                    odometer: odometer || null,
-                    estimatedCompletion: estimatedCompletion ? new Date(estimatedCompletion) : null,
-                    status: 'PENDING', // Default is PENDING, but adding note if stock issue
-                    notes: orderNotes,
-                    laborTotal: estimate.laborTotal,
-                    partsTotal: estimate.partsTotal,
-                    totalAmount: estimate.totalAmount,
-                    items: {
-                        create: orderItems
+                    for (const item of sourceData.items) {
+                        if (item.inventoryItemId) {
+                            const inventoryItem = await prisma.inventoryItem.findUnique({
+                                where: { id: item.inventoryItemId }
+                            });
+
+                            if (inventoryItem) {
+                                if (inventoryItem.quantity < item.quantity) {
+                                    hasInsufficientStock = true;
+                                }
+
+                                await prisma.inventoryItem.update({
+                                    where: { id: item.inventoryItemId },
+                                    data: { quantity: { decrement: item.quantity } }
+                                });
+                            }
+                        }
                     }
+
+                    if (hasInsufficientStock) {
+                        orderNotes = "Waiting for parts";
+                    }
+
+                    // Create Service Order
+                    const newOrder = await prisma.serviceOrder.create({
+                        data: {
+                            id: customId,
+                            customerId: sourceData.customerId,
+                            vehicleId: sourceData.vehicleId,
+                            sourceEstimateId: sourceData.sourceEstimateId,
+                            mechanicId: mechanicId || null,
+                            odometer: odometer || null,
+                            estimatedCompletion: estimatedCompletion ? new Date(estimatedCompletion) : null,
+                            status: 'PENDING',
+                            notes: orderNotes,
+                            laborTotal: sourceData.laborTotal,
+                            partsTotal: sourceData.partsTotal,
+                            totalAmount: sourceData.totalAmount,
+                            items: {
+                                create: orderItems
+                            }
+                        }
+                    });
+
+                    // Update Estimate Status if applicable
+                    if (sourceData.sourceEstimateId) {
+                        await prisma.estimate.update({
+                            where: { id: sourceData.sourceEstimateId },
+                            data: { status: 'APPROVED' }
+                        });
+                    }
+
+                    return newOrder;
+                });
+                break; // Success
+            } catch (error) {
+                if (error.code === 'P2002') {
+                    retries--;
+                    if (retries === 0) throw error;
+                    continue;
                 }
-            });
+                throw error;
+            }
+        }
 
-            // Update Estimate Status to APPROVED (if not already)
-            await prisma.estimate.update({
-                where: { id: estimate.id },
-                data: { status: 'APPROVED' }
-            });
-
-            return newOrder;
-        });
 
         res.status(201).json({
             message: 'Service Order created successfully',
@@ -609,9 +648,18 @@ router.post('/:id/advisories', authenticateToken, authorizeRoles(['staff', 'admi
             return res.status(400).json({ message: 'Content is required' });
         }
 
-        let imageUrl = null;
-        let imageFileId = null;
+        // 1. Create Advisory Record First (without image)
+        const advisory = await prisma.serviceOrderAdvisory.create({
+            data: {
+                orderId: id,
+                content,
+                severity: severity || 'LOW',
+                imageUrl: null,
+                imageFileId: null
+            }
+        });
 
+        // 2. Upload Image if present
         if (file) {
             try {
                 const fileBuffer = fs.readFileSync(file.path);
@@ -621,28 +669,30 @@ router.post('/:id/advisories', authenticateToken, authorizeRoles(['staff', 'admi
                     folder: '/advisories'
                 });
 
-                imageUrl = uploadResponse.url;
-                imageFileId = uploadResponse.fileId;
+                // 3. Update Advisory with Image Details
+                await prisma.serviceOrderAdvisory.update({
+                    where: { id: advisory.id },
+                    data: {
+                        imageUrl: uploadResponse.url,
+                        imageFileId: uploadResponse.fileId
+                    }
+                });
 
-                // Cleanup local file
-                fs.unlinkSync(file.path);
+                // Update returned object
+                advisory.imageUrl = uploadResponse.url;
+                advisory.imageFileId = uploadResponse.fileId;
+
             } catch (uploadError) {
                 console.error('ImageKit Upload Error:', uploadError);
-                // Try cleanup
-                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-                return res.status(500).json({ message: 'Failed to upload image' });
+                // We don't fail the request, just log error. Advisory is created without image.
+                // Could optionally add a 'note' or flash message that image failed.
+            } finally {
+                // 4. Cleanup local file
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
             }
         }
-
-        const advisory = await prisma.serviceOrderAdvisory.create({
-            data: {
-                orderId: id,
-                content,
-                severity: severity || 'LOW',
-                imageUrl,
-                imageFileId
-            }
-        });
 
         res.status(201).json(advisory);
 
@@ -779,5 +829,60 @@ router.delete('/:id/advisories/:advisoryId', authenticateToken, authorizeRoles([
     }
 });
 
-export default router;
+/**
+ * @route DELETE /api/service-orders/:id
+ * @desc Delete (Archive) a service order
+ * @access Staff, Admin
+ */
+router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
 
+        const order = await prisma.serviceOrder.findUnique({
+            where: { id },
+            include: { advisories: true }
+        });
+
+        if (!order) {
+            return res.status(404).json({ message: 'Service Order not found' });
+        }
+
+        // Transaction to delete everything
+        await prisma.$transaction(async (prisma) => {
+            // 1. Delete all items
+            await prisma.serviceOrderItem.deleteMany({
+                where: { orderId: id }
+            });
+
+            // 2. Delete all advisories (and cleanup images)
+            for (const advisory of order.advisories) {
+                if (advisory.imageFileId) {
+                    await imagekit.deleteFile(advisory.imageFileId).catch(err => {
+                        console.warn('Failed to delete advisory image:', err);
+                    });
+                }
+            }
+            await prisma.serviceOrderAdvisory.deleteMany({
+                where: { orderId: id }
+            });
+
+            // 3. Delete the order itself
+            await prisma.serviceOrder.delete({
+                where: { id }
+            });
+
+            // Optional: Revert estimate status? 
+            // If we archive/delete a cancelled order, usually we just want it gone.
+            // If sourceEstimateId exists, maybe we update it?
+            // Leaving estimate touched for now as the prompt didn't specify.
+        });
+
+        res.json({ message: 'Service Order archived/deleted successfully' });
+
+    } catch (error) {
+        console.error('Delete Service Order Error:', error);
+        res.status(500).json({ message: 'Failed to delete service order', error: error.message });
+    }
+});
+
+export default router;

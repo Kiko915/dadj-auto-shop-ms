@@ -26,7 +26,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import type { ServiceOrder } from '../types'
-import { formatDate, getInitials, getStatusVariant, isOverdue, isDueToday } from '../utils'
+import { formatDate, getInitials, getStatusVariant, isOverdue, isDueToday, formatStatus } from '../utils'
 
 defineProps<{
     orders: ServiceOrder[],
@@ -147,7 +147,7 @@ const router = useRouter()
                     </TableCell>
                     <TableCell>
                         <Badge :variant="getStatusVariant(order.status)" class="rounded-full px-2.5 font-normal">
-                            {{ order.status.replace('_', ' ') }}
+                            {{ formatStatus(order.status) }}
                         </Badge>
                     </TableCell>
                     <!-- Notes Column -->
@@ -170,7 +170,7 @@ const router = useRouter()
                     <TableCell class="text-right">
                     <DropdownMenu>
                         <DropdownMenuTrigger as-child>
-                        <Button variant="ghost" class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 transition-opacity">
                             <span class="sr-only">Open menu</span>
                             <MoreHorizontal class="h-4 w-4" />
                         </Button>

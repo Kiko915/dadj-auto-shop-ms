@@ -101,6 +101,7 @@ const tempEstimate = ref(null)
 // Conversion Dialog State
 const showConvertDialog = ref(false)
 const estimateToConvert = ref(null)
+const isLoadingEstimate = ref(false)
 
 // Methods
 const fetchData = async () => {
@@ -190,6 +191,7 @@ const navigateToEdit = (id: string) => {
 const handleStatusUpdate = async (id: string, newStatus: string) => {
     // Intercept Approval to open dialog
     if (newStatus === 'APPROVED') {
+        isLoadingEstimate.value = true
         try {
             // We need full estimate details for the dialog (items, etc.)
             // The list view only has summary data
@@ -199,6 +201,8 @@ const handleStatusUpdate = async (id: string, newStatus: string) => {
         } catch (error) {
             console.error('Failed to prepare conversion', error)
             toast.error('Failed to load estimate details')
+        } finally {
+            isLoadingEstimate.value = false
         }
         return
     }
@@ -407,8 +411,9 @@ onMounted(fetchData)
                   <DropdownMenuItem 
                     v-if="estimate.status === 'DRAFT' || estimate.status === 'PENDING'"
                     @click="handleStatusUpdate(estimate.id, 'APPROVED')"
+                    :disabled="isLoadingEstimate"
                   >
-                    Mark as Approved
+                    {{ isLoadingEstimate ? 'Processing...' : 'Mark as Approved' }}
                   </DropdownMenuItem>
                    <DropdownMenuItem 
                     v-if="estimate.status === 'DRAFT'"

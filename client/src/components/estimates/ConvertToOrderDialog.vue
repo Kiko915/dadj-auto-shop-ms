@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { createServiceOrder } from '@/api/serviceOrders'
 import { getMechanics } from '@/api/users'
 import { toast } from 'vue-sonner'
-import { onMounted } from 'vue'
+
 
 const props = defineProps({
   open: Boolean,
@@ -99,7 +99,7 @@ onMounted(() => {
 })
 
 // Initial fetch when dialog opens (handled by parent v-if usually, but we can watch prop)
-import { watch } from 'vue'
+
 watch(() => props.open, (newVal) => {
     if (newVal) {
         fetchMechanics()

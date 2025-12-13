@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Search, Plus, LayoutGrid, List, User, CircleDashed, Calendar, RefreshCw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { getServiceOrders } from '@/api/serviceOrders'
+import { getMechanics } from '@/api/users'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +34,7 @@ const totalPages = ref(1)
 const totalItems = ref(0)
 const viewMode = ref<'BOARD' | 'LIST'>('BOARD')
 const rawOrders = ref<ServiceOrder[]>([])
+const availableMechanics = ref<any[]>([])
 
 // Modal State
 const selectedOrderId = ref<string | null>(null)
@@ -112,9 +114,14 @@ const filteredOrders = computed(() => {
     return rawOrders.value
 })
 
-const mechanics = computed(() => {
-    return Array.from(new Set(rawOrders.value.map(o => o.mechanic?.name).filter(Boolean)))
-})
+const fetchMechanics = async () => {
+    try {
+        const res = await getMechanics()
+        availableMechanics.value = res
+    } catch (error) {
+        console.error('Failed to load mechanics', error)
+    }
+}
 
 // Debounce search
 let searchTimeout: ReturnType<typeof setTimeout> | undefined
@@ -128,7 +135,10 @@ onUnmounted(() => {
 })
 
 // Initial load
-onMounted(fetchData)
+onMounted(() => {
+    fetchData()
+    fetchMechanics()
+})
 </script>
 
 <template>
@@ -143,7 +153,7 @@ onMounted(fetchData)
          <Button variant="outline" size="icon" @click="fetchData()" :disabled="loading">
             <RefreshCw class="h-4 w-4" :class="{'animate-spin': loading}" />
          </Button>
-         <Button @click="router.push('/dashboard/estimates/new')">
+         <Button @click="router.push({ name: 'new-service-order' })">
             <Plus class="mr-2 h-4 w-4" />
             Create Direct Order
           </Button>
@@ -211,8 +221,8 @@ onMounted(fetchData)
                 <SelectContent>
                     <SelectItem value="ALL">All Mechanics</SelectItem>
                     <SelectItem value="Unassigned">Unassigned</SelectItem>
-                    <template v-for="mech in mechanics" :key="mech">
-                         <SelectItem :value="mech as string">{{ mech }}</SelectItem>
+                    <template v-for="mech in availableMechanics" :key="mech.id">
+                         <SelectItem :value="mech.name">{{ mech.name }}</SelectItem>
                     </template>
                 </SelectContent>
             </Select>

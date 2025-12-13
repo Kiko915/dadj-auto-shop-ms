@@ -79,19 +79,20 @@ const handleDragEnd = async (event: any, targetStatus: string) => {
     const itemToUpdate = currentList.value.find(item => item.status !== targetStatus)
     
     if (itemToUpdate) {
-        const oldStatus = itemToUpdate.status
+        // Clone and replace in list to avoid prop mutation
+        const index = currentList.value.indexOf(itemToUpdate)
+        if (index !== -1) {
+            const updatedItem = { ...itemToUpdate, status: targetStatus }
+            currentList.value[index] = updatedItem
+        }
+
         try {
-            // Optimistic update locally
-            itemToUpdate.status = targetStatus
-            
             await updateServiceOrder(itemToUpdate.id, { status: targetStatus })
             toast.success(`Order updated to ${COLUMNS[targetStatus as keyof typeof COLUMNS]}`)
-            emit('refresh') // Optional: to refetch fresh data or keep sync
+            emit('refresh') 
         } catch (error) {
             console.error('Failed to update status', error)
             toast.error('Failed to update status')
-            // Revert
-            itemToUpdate.status = oldStatus
             emit('refresh') // Force reload to fix UI lists
         }
     }
