@@ -24,7 +24,7 @@ import { addServiceOrderItem, updateServiceOrderItem, deleteServiceOrderItem } f
 import { formatCurrency } from '../utils'
 
 const props = defineProps<{
-    items: any[],
+    items: Array<{ id: string | number; [key: string]: any }>,
     orderId: string,
     loading: boolean
 }>()
@@ -50,7 +50,7 @@ const itemToDelete = ref<any>(null)
 const isDeleting = ref(false)
 
 const startEdit = (item: any) => {
-    editingItemId.value = item.id
+    editingItemId.value = String(item.id)
     editForm.value = {
         name: item.name,
         description: item.description,
@@ -163,7 +163,7 @@ const saveAddItem = async () => {
                 <TableBody>
                     <TableRow v-for="item in items" :key="item.id" class="group">
                         <!-- Edit Mode -->
-                        <template v-if="editingItemId === item.id">
+                        <template v-if="editingItemId === String(item.id)">
                             <TableCell><input v-model="editForm.name" class="w-full border rounded px-2 py-1 text-sm" /></TableCell>
                             <TableCell><input v-model="editForm.description" class="w-full border rounded px-2 py-1 text-sm" /></TableCell>
                             <TableCell><input v-model.number="editForm.quantity" type="number" class="w-full border rounded px-2 py-1 text-sm text-right" /></TableCell>
@@ -171,7 +171,7 @@ const saveAddItem = async () => {
                             <TableCell class="text-right font-mono">{{ formatCurrency(editForm.price * editForm.quantity) }}</TableCell>
                             <TableCell>
                                 <div class="flex items-center gap-1 justify-end">
-                                    <Button size="icon" variant="ghost" class="h-6 w-6 text-green-600" @click="saveEdit(item.id)"><CheckCircle class="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" class="h-6 w-6 text-green-600" @click="saveEdit(String(item.id))"><CheckCircle class="h-4 w-4" /></Button>
                                     <Button size="icon" variant="ghost" class="h-6 w-6 text-red-600" @click="cancelEdit"><X class="h-4 w-4" /></Button>
                                 </div>
                             </TableCell>
