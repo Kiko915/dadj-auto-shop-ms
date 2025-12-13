@@ -8,10 +8,36 @@ import imagekit from '../config/imagekit.js';
 
 const router = express.Router();
 
+router.get('/mechanics', authenticateToken, authorizeRoles(['admin', 'staff']), async (req, res) => {
+    try {
+        const mechanics = await prisma.user.findMany({
+            where: {
+                role: 'mechanic',
+                isActive: true
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                profilePicture: true
+            }
+        });
+        res.json(mechanics);
+    } catch (error) {
+        console.error('Get Mechanics Error:', error);
+        res.status(500).json({ message: 'Failed to fetch mechanics' });
+    }
+});
+
 /**
  * @route GET /api/users
  * @description Get all users with pagination, search, and filtering
  * @access Admin only
+ * @query {number} page - Page number (default 1)
+ * @query {number} pageSize - Page size (default 10)
+ * @query {string} search - Search term (name or email)
+ * @query {string} role - Filter by role (admin, staff, mechanic)
+ * @query {string} status - Filter by status (active: true/false)
  */
 router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {

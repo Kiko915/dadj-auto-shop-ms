@@ -5,9 +5,14 @@ import api from './index'
  * Get all service orders
  * @returns {Promise} Response with service orders array
  */
-export const getServiceOrders = async () => {
+/**
+ * Get all service orders with pagination and filtering
+ * @param {Object} params - Query parameters (page, limit, search, status)
+ * @returns {Promise} Response with service orders array
+ */
+export const getServiceOrders = async (params = {}) => {
   try {
-    const response = await api.get('/service-orders')
+    const response = await api.get('/service-orders', { params })
     return response.data
   } catch (error) {
     throw error
@@ -71,6 +76,33 @@ export const updateServiceOrder = async (serviceOrderId, serviceOrderData) => {
   }
 }
 
+export const addServiceOrderItem = async (serviceOrderId, itemData) => {
+  try {
+    const response = await api.post(`/service-orders/${serviceOrderId}/items`, itemData)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const updateServiceOrderItem = async (serviceOrderId, itemId, itemData) => {
+  try {
+    const response = await api.put(`/service-orders/${serviceOrderId}/items/${itemId}`, itemData)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const deleteServiceOrderItem = async (serviceOrderId, itemId) => {
+  try {
+    const response = await api.delete(`/service-orders/${serviceOrderId}/items/${itemId}`)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
 /**
  * Delete a service order
  * @param {string} serviceOrderId - Service Order ID
@@ -79,6 +111,42 @@ export const updateServiceOrder = async (serviceOrderId, serviceOrderData) => {
 export const deleteServiceOrder = async (serviceOrderId) => {
   try {
     const response = await api.delete(`/service-orders/${serviceOrderId}`)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const addServiceOrderAdvisory = async (serviceOrderId, formData) => {
+  try {
+    const response = await api.post(`/service-orders/${serviceOrderId}/advisories`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+
+export const updateServiceOrderAdvisory = async (serviceOrderId, advisoryId, formData) => {
+  try {
+    const response = await api.put(`/service-orders/${serviceOrderId}/advisories/${advisoryId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const deleteServiceOrderAdvisory = async (serviceOrderId, advisoryId) => {
+  try {
+    const response = await api.delete(`/service-orders/${serviceOrderId}/advisories/${advisoryId}`)
     return response.data
   } catch (error) {
     throw error
