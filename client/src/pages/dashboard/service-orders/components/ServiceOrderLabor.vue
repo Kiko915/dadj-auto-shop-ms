@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { Wrench, Plus, CheckCircle, X, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -65,10 +66,14 @@ const cancelEdit = () => {
 const saveEdit = async (itemId: string) => {
     try {
         await updateServiceOrderItem(props.orderId, itemId, editForm.value)
+        toast.success('Labor updated successfully')
         editingItemId.value = null
         emit('order-updated')
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to update item', error)
+        toast.error('Failed to update labor', {
+            description: error.response?.data?.message || error.message || 'An error occurred'
+        })
     }
 }
 
@@ -100,6 +105,21 @@ const cancelAdd = () => {
 }
 
 const saveAddItem = async () => {
+    if (!addItemForm.value.name) {
+        toast.error('Please provide a service name')
+        return
+    }
+    
+    if (typeof addItemForm.value.quantity !== 'number' || addItemForm.value.quantity <= 0) {
+        toast.error('Hours must be greater than 0')
+        return
+    }
+
+    if (typeof addItemForm.value.price !== 'number' || addItemForm.value.price <= 0) {
+        toast.error('Price must be greater than 0')
+        return
+    }
+
     try {
         const payload = {
             type: 'LABOR',
@@ -109,8 +129,12 @@ const saveAddItem = async () => {
         await addServiceOrderItem(props.orderId, payload)
         cancelAdd()
         emit('order-updated')
-    } catch (error) {
+        toast.success('Labor item added')
+    } catch (error: any) {
         console.error('Failed to add item', error)
+        toast.error('Failed to add item', {
+            description: error.response?.data?.message || error.message || 'An error occurred'
+        })
     }
 }
 </script>

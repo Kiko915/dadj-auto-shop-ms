@@ -32,6 +32,10 @@ const editingId = ref<string | null>(null)
 const selectedImage = ref<File | null>(null)
 const previewUrl = ref<string | null>(null)
 
+const showConfirmDelete = ref(false)
+const selectedAdvisoryId = ref<string | null>(null)
+const isDeleting = ref(false)
+
 const formData = ref({
     content: '',
     severity: 'LOW'
@@ -137,19 +141,30 @@ const handleSubmit = async () => {
     }
 }
 
-const handleDelete = async (advisoryId: string) => {
-    // In a real app, might want a confirmation dialog here
+const handleDelete = (advisoryId: string) => {
+    selectedAdvisoryId.value = advisoryId
+    showConfirmDelete.value = true
+}
+
+const confirmDelete = async () => {
+    if (!selectedAdvisoryId.value) return
+
+    isDeleting.value = true
     try {
-        await deleteServiceOrderAdvisory(props.orderId, advisoryId)
+        await deleteServiceOrderAdvisory(props.orderId, selectedAdvisoryId.value)
         toast.success('Advisory Deleted', {
             description: 'The advisory has been removed.',
         })
         emit('order-updated')
+        showConfirmDelete.value = false
+        selectedAdvisoryId.value = null
     } catch (error) {
         console.error('Failed to delete advisory', error)
         toast.error('Error', {
             description: 'Failed to delete advisory.',
         })
+    } finally {
+        isDeleting.value = false
     }
 }
 </script>
@@ -301,5 +316,23 @@ const handleDelete = async (advisoryId: string) => {
                 </div>
             </div>
         </div>
+
+
+        <Dialog :open="showConfirmDelete" @update:open="(val) => { if(!val) { showConfirmDelete = false; selectedAdvisoryId = null } }">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete Advisory</DialogTitle>
+                    <DialogDescription>
+                        Are you sure you want to delete this advisory? This action cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" @click="showConfirmDelete = false">Cancel</Button>
+                    <Button variant="destructive" @click="confirmDelete" :disabled="isDeleting">
+                        {{ isDeleting ? 'Deleting...' : 'Delete Advisory' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>

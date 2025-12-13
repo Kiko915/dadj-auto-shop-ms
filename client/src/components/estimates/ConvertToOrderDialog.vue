@@ -69,7 +69,7 @@ const hasInventoryIssues = computed(() => {
 const formSchema = toTypedSchema(z.object({
   estimatedCompletion: z.string().min(1, 'Completion date is required'),
   mechanicId: z.string().optional(),
-  odometer: z.coerce.number().min(0, 'Odometer must be positive').optional()
+  odometer: z.coerce.number().min(0, 'Odometer must be non-negative').optional()
 }))
 
 const { handleSubmit, errors, setFieldValue, values } = useForm({

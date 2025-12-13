@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import { Car, Plus, CheckCircle, X, Wrench, Search, AlertTriangle, Package, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -168,11 +169,15 @@ const saveEdit = async (itemId: string) => {
 
     try {
         await updateServiceOrderItem(props.orderId, itemId, editForm.value)
+        toast.success('Part updated successfully')
         editingItemId.value = null
         editStockAlert.value = null
         emit('order-updated')
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to update item', error)
+        toast.error('Failed to update part', {
+            description: error.response?.data?.message || error.message || 'An error occurred'
+        })
     }
 }
 
@@ -209,6 +214,26 @@ const cancelAdd = () => {
 }
 
 const saveAddItem = async () => {
+    if (!addItemForm.value.name) {
+        toast.error('Please provide a part name')
+        return
+    }
+
+    if (typeof addItemForm.value.quantity !== 'number' || addItemForm.value.quantity <= 0) {
+        toast.error('Quantity must be greater than 0')
+        return
+    }
+
+    if (typeof addItemForm.value.price !== 'number' || addItemForm.value.price <= 0) {
+        toast.error('Price must be greater than 0')
+        return
+    }
+
+    if (stockAlert.value) {
+        toast.error('Cannot add item: Insufficient stock')
+        return
+    }
+
     try {
         const payload = {
             type: 'PART',
@@ -217,8 +242,12 @@ const saveAddItem = async () => {
         await addServiceOrderItem(props.orderId, payload)
         cancelAdd()
         emit('order-updated')
-    } catch (error) {
+        toast.success('Part item added')
+    } catch (error: any) {
         console.error('Failed to add item', error)
+        toast.error('Failed to add item', {
+            description: error.response?.data?.message || error.message || 'An error occurred'
+        })
     }
 }
 </script>
@@ -228,7 +257,7 @@ const saveAddItem = async () => {
         <div v-if="loading" class="space-y-3">
             <Skeleton class="h-12 w-full" v-for="i in 5" :key="i" />
         </div>
-        <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg bg-slate-50/50">
+        <div v-else-if="items.length === 0 && !isAddingPart" class="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg bg-slate-50/50">
             <Car class="h-10 w-10 mb-2 opacity-20" />
             <p class="font-medium">No parts used</p>
             <p class="text-xs">No parts have been charged to this order yet.</p>
