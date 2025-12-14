@@ -150,8 +150,21 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
 // GET /api/payments (List all payments)
 router.get('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const { page = '1', limit = '10' } = req.query;
+
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+
+        if (isNaN(pageNum) || pageNum < 1) {
+            return res.status(400).json({ message: 'Invalid page number' });
+        }
+        if (isNaN(limitNum) || limitNum < 1) {
+            return res.status(400).json({ message: 'Invalid limit number' });
+        }
+
+        // Enforce max limit to prevent fetching too many records
+        const sanitizedLimit = Math.min(limitNum, 100);
+        const skip = (pageNum - 1) * sanitizedLimit;
 
         const [payments, total] = await prisma.$transaction([
             prisma.payment.findMany({
@@ -170,7 +183,7 @@ router.get('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (re
                 },
                 orderBy: { date: 'desc' },
                 skip,
-                take: parseInt(limit)
+                take: sanitizedLimit
             }),
             prisma.payment.count()
         ]);
@@ -178,8 +191,8 @@ router.get('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (re
         res.json({
             items: payments,
             totalItems: total,
-            totalPages: Math.ceil(total / parseInt(limit)),
-            currentPage: parseInt(page)
+            totalPages: Math.ceil(total / sanitizedLimit),
+            currentPage: pageNum
         });
     } catch (error) {
         console.error('Error fetching payments:', error);
@@ -206,6 +219,14 @@ router.get('/:id/receipt', authenticateToken, async (req, res) => {
 
         if (!payment) return res.status(404).send('Payment not found');
 
+        // Authorization: Admin/Staff or the Customer who owns the order
+        const isStaffOrAdmin = ['admin', 'staff'].includes(req.user.role);
+        const isOwner = req.user.id === payment.order.customerId;
+
+        if (!isStaffOrAdmin && !isOwner) {
+            return res.status(403).send('Unauthorized access to receipt');
+        }
+
         const html = generateReceiptHtml(payment.order, payment);
         res.send(html);
 
@@ -215,17 +236,28 @@ router.get('/:id/receipt', authenticateToken, async (req, res) => {
     }
 });
 
+// Helper to prevent XSS
+const escapeHtml = (unsafe) => {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function generateReceiptHtml(order, payment) {
     const totalAmount = Number(order.totalAmount);
     // For receipt view, we can show total paid so far inclusive of this payment or just this payment.
     // Standard receipt usually shows invoice details.
-    // Let's assume we show the Snapshot at the time of payment?
-    // Actually, simply showing current order state is easier and sufficient for "Redownload".
-    const amountPaidSoFar = Number(order.amountPaid);
+
+    // Correctly accessing amountPaid from the numeric field in ServiceOrder model
+    const amountPaidSoFar = Number(order.amountPaid) || 0;
     const balanceRemaining = Math.max(0, totalAmount - amountPaidSoFar);
 
     const formatCurrency = (val) => '₱' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const paymentDate = new Date(payment.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const paymentDate = new Date(payment.date).toLocaleDateString();
 
     return `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8fafc; padding: 20px;">
@@ -243,7 +275,7 @@ function generateReceiptHtml(order, payment) {
                                 <div style="height: 30px; width: 1px; background-color: #e2e8f0; margin: 0 15px;"></div>
                                 <div>
                                 <h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: -0.5px;">INVOICE</h1>
-                                <p style="margin: 2px 0 0; font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">ID: ${order.id}</p>
+                                <p style="margin: 2px 0 0; font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">ID: ${escapeHtml(order.id)}</p>
                                 </div>
                         </div>
                         <div style="text-align: right; margin-left: 80px;">
@@ -257,13 +289,13 @@ function generateReceiptHtml(order, payment) {
                         <tr>
                             <td style="width: 50%; vertical-align: top;">
                                 <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Bill To</p>
-                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${order.customer.firstName} ${order.customer.lastName}</p>
-                                <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">${order.customer.phoneNumber}</p>
+                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(order.customer.firstName)} ${escapeHtml(order.customer.lastName)}</p>
+                                <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">${escapeHtml(order.customer.phoneNumber)}</p>
                             </td>
                             <td style="width: 50%; vertical-align: top; text-align: right;">
                                 <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Vehicle Details</p>
-                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${order.vehicle.make} ${order.vehicle.model}</p>
-                                <span style="display: inline-block; background-color: #f1f5f9; color: #475569; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-top: 4px;">${order.vehicle.licensePlate}</span>
+                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(order.vehicle.make)} ${escapeHtml(order.vehicle.model)}</p>
+                                <span style="display: inline-block; background-color: #f1f5f9; color: #475569; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-top: 4px;">${escapeHtml(order.vehicle.licensePlate)}</span>
                             </td>
                         </tr>
                     </table>
@@ -282,8 +314,8 @@ function generateReceiptHtml(order, payment) {
                             ${order.items.map(item => `
                             <tr style="border-bottom: 1px solid #f8fafc;">
                                 <td style="padding: 12px 30px; vertical-align: top;">
-                                    <p style="margin: 0; font-size: 14px; font-weight: 500; color: #334155;">${item.name}</p>
-                                    <p style="margin: 2px 0 0; font-size: 10px; color: #94a3b8;">${item.type} × ${item.quantity} @ ${formatCurrency(item.price)}</p>
+                                    <p style="margin: 0; font-size: 14px; font-weight: 500; color: #334155;">${escapeHtml(item.name)}</p>
+                                    <p style="margin: 2px 0 0; font-size: 10px; color: #94a3b8;">${escapeHtml(item.type)} × ${item.quantity} @ ${formatCurrency(item.price)}</p>
                                 </td>
                                 <td style="padding: 12px 30px; text-align: right; vertical-align: top; font-family: monospace; font-size: 14px; color: #334155;">
                                     ${formatCurrency(item.total)}
@@ -337,7 +369,7 @@ function generateReceiptHtml(order, payment) {
                         <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Payment Received</p>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 14px; font-weight: 700; color: #0f172a;">${formatCurrency(payment.amount)}</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #475569; background-color: white; padding: 2px 8px; border-radius: 4px; margin-left: 30px;">${payment.method} ${payment.referenceNo ? `(#${payment.referenceNo})` : ''}</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #475569; background-color: white; padding: 2px 8px; border-radius: 4px; margin-left: 30px;">${escapeHtml(payment.method)} ${payment.referenceNo ? `(#${escapeHtml(payment.referenceNo)})` : ''}</span>
                         </div>
                     </div>
 

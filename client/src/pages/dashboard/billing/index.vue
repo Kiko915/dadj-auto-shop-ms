@@ -24,7 +24,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+// Explicit imports to fix resolution issue
+import Tabs from '@/components/ui/tabs/Tabs.vue'
+import TabsList from '@/components/ui/tabs/TabsList.vue'
+import TabsTrigger from '@/components/ui/tabs/TabsTrigger.vue'
+import TabsContent from '@/components/ui/tabs/TabsContent.vue'
 import { 
     DollarSign, 
     FileText, 
@@ -71,9 +75,16 @@ const downloadReport = (format) => {
             document.body.appendChild(fileLink);
             fileLink.click();
             document.body.removeChild(fileLink);
+            setTimeout(() => {
+                URL.revokeObjectURL(fileURL);
+            }, 100);
         } else {
             // HTML / PDF View
             window.open(fileURL, '_blank');
+            // Give browser time to load the blob in new tab
+            setTimeout(() => {
+                URL.revokeObjectURL(fileURL);
+            }, 5000);
         }
     }).catch(() => {
         toast.error('Error', { description: 'Failed to download report' })
@@ -122,11 +133,11 @@ const fetchInvoices = async (page = 1) => {
             params: { 
                 page, 
                 limit: 10,
-                // status: 'ALL' // Or implicit
+                status: 'PENDING,IN_PROGRESS,COMPLETED'
             } 
         })
         
-        invoices.value = (ordersRes.data.items || []).filter(o => o.status !== 'CANCELLED')
+        invoices.value = ordersRes.data.items || []
         invoicesTotalPages.value = ordersRes.data.totalPages || 1
     } catch (error) {
         console.error('Failed to load invoices', error)
@@ -211,6 +222,10 @@ const downloadReceipt = async (paymentId) => {
     try {
         const response = await api.get(`/payments/${paymentId}/receipt`)
         const receiptWindow = window.open('', '_blank')
+        if (!receiptWindow) {
+            toast.error('Error', { description: 'Popup blocked. Please allow popups for this site.' })
+            return
+        }
         receiptWindow.document.write(response.data)
         receiptWindow.document.close()
     } catch (error) {
@@ -474,7 +489,7 @@ const settleBalance = (orderId) => {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date</TableHead>
-                                    <TableHead>Orde Ref</TableHead>
+                                    <TableHead>Order Ref</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Method</TableHead>
                                     <TableHead>Ref No.</TableHead>

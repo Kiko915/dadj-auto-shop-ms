@@ -102,6 +102,8 @@ router.get('/daily', authenticateToken, authorizeRoles(['admin', 'staff']), asyn
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+        console.log(`[DailyReport] Generating for: ${today.toISOString()} to ${tomorrow.toISOString()}`);
+
         // Fetch all payments for today
         const payments = await prisma.payment.findMany({
             where: {
@@ -121,6 +123,8 @@ router.get('/daily', authenticateToken, authorizeRoles(['admin', 'staff']), asyn
             orderBy: { date: 'asc' }
         });
 
+        console.log(`[DailyReport] Found ${payments.length} payments.`);
+
         // Calculate Totals
         const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount), 0);
         const methodBreakdown = payments.reduce((acc, p) => {
@@ -130,16 +134,39 @@ router.get('/daily', authenticateToken, authorizeRoles(['admin', 'staff']), asyn
 
         // --- CSV FORMAT ---
         if (format === 'csv') {
+            const escapeCSV = (field) => {
+                if (!field && field !== 0) return ''; // Handle 0 correctly? Input says returns empty string for falsy.
+                // Revisiting user requirement: "(1) returns empty string for falsy input"
+                // So if field is 0, it becomes empty string? That might be bad for numeric fields if I used it there. 
+                // But I am only calculating text fields.
+                // Let's stick strictly: 
+                if (!field) return '';
+
+                let str = String(field);
+
+                // 1. Prevent Formula Injection (Excel/Sheets)
+                if (/^[=+\-@\t\r]/.test(str)) {
+                    str = "'" + str;
+                }
+
+                // 2. Escape for CSV (Wrap in quotes if contains comma, quote, or newline)
+                if (/[",\n\r]/.test(str)) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+
+                return str;
+            };
+
             const headers = ['Date', 'Time', 'Order ID', 'Customer', 'Method', 'Reference', 'Amount'];
             const rows = payments.map(p => {
                 const d = new Date(p.date);
                 return [
                     d.toLocaleDateString(),
                     d.toLocaleTimeString(),
-                    p.orderId,
-                    `"${p.order?.customer?.firstName} ${p.order?.customer?.lastName}"`, // Quote for safety
-                    p.method,
-                    `"${p.referenceNo || ''}"`,
+                    escapeCSV(p.orderId),
+                    escapeCSV(`${p.order?.customer?.firstName} ${p.order?.customer?.lastName}`),
+                    escapeCSV(p.method),
+                    escapeCSV(p.referenceNo),
                     Number(p.amount).toFixed(2)
                 ].join(',');
             });
@@ -174,15 +201,25 @@ router.get('/daily', authenticateToken, authorizeRoles(['admin', 'staff']), asyn
                 console.error('Error loading logo:', err);
             }
 
+            const escapeHtml = (unsafe) => {
+                if (!unsafe) return '';
+                return String(unsafe)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            };
+
             const rowsHtml = payments.map((p, index) => `
                 <tr style="background-color: ${index % 2 === 0 ? 'white' : '#f9fafb'};">
                     <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">${new Date(p.date).toLocaleTimeString()}</td>
                     <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">${p.orderId}</td>
-                    <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 500;">${p.order?.customer?.firstName} ${p.order?.customer?.lastName}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; font-weight: 500;">${escapeHtml(p.order?.customer?.firstName)} ${escapeHtml(p.order?.customer?.lastName)}</td>
                     <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">
                         <span style="padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #1e40af; font-size: 10px; font-weight: 600;">${p.method}</span>
                     </td>
-                    <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${p.referenceNo || '-'}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${escapeHtml(p.referenceNo || '-')}</td>
                     <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-align: right; font-family: monospace;">${formatCurrency(p.amount)}</td>
                 </tr>
             `).join('');
