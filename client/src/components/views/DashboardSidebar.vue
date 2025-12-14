@@ -164,7 +164,6 @@ const navigationItems = [
         icon: DollarSign,
         url: '/dashboard/billing',
         description: 'Invoices and payments',
-        comingSoon: true
       },
 
     ],

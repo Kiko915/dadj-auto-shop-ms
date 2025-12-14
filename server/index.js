@@ -50,10 +50,22 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/estimates', estimateRoutes);
+import financialReports from './routes/financial-reports.js';
+
+// ... (other imports)
+
+// Mount Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/estimates', estimateRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/service-orders', serviceRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/reports', financialReports);
 
 app.listen(PORT, () => {
     // Use template literals for cleaner console logging
