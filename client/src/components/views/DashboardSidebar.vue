@@ -150,7 +150,6 @@ const navigationItems = [
             title: 'Job Board',
             url: '/dashboard/service-orders',
             description: 'Active repairs & status board',
-            comingSoon: true
           },
           {
             title: 'Service History',

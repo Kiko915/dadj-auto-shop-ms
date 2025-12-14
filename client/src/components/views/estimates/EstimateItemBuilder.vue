@@ -28,6 +28,10 @@ const props = defineProps({
   items: {
     type: Array,
     default: () => []
+  },
+  title: {
+    type: String,
+    default: 'Estimate Items Builder'
   }
 })
 
@@ -169,7 +173,7 @@ const removeItem = (index) => {
         <CardHeader class="pb-4">
         <CardTitle class="text-lg flex items-center gap-2">
             <Wrench class="w-5 h-5 text-muted-foreground"/>
-            Estimate Items Builder
+            {{ title }}
         </CardTitle>
         <CardDescription>Add parts from inventory or custom labor charges.</CardDescription>
         </CardHeader>

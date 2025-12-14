@@ -181,9 +181,12 @@ const getInitials = (name) => {
                       class="font-medium"
                       :class="{ 'text-destructive': item.quantity <= (item.lowStockThreshold || 5) }"
                     >
-                      {{ item.quantity }} units
+                      {{ Math.max(0, item.quantity) }} units
                     </span>
-                    <span class="text-muted-foreground text-[10px]">
+                    <span v-if="item.quantity < 0" class="text-destructive font-bold text-[10px] bg-destructive/10 px-1.5 py-0.5 rounded-full border border-destructive/20">
+                      Order {{ Math.abs(item.quantity) }} more
+                    </span>
+                    <span v-else class="text-muted-foreground text-[10px]">
                       {{ item.quantity <= (item.lowStockThreshold || 5) ? 'Low Stock' : 'In Stock' }}
                     </span>
                   </div>
@@ -191,7 +194,7 @@ const getInitials = (name) => {
                     <div 
                       class="h-full rounded-full transition-all duration-500"
                       :class="item.quantity <= (item.lowStockThreshold || 5) ? 'bg-destructive' : 'bg-primary'"
-                      :style="{ width: `${Math.min((item.quantity / ((item.lowStockThreshold || 5) * 3)) * 100, 100)}%` }"
+                      :style="{ width: `${Math.max(0, Math.min((item.quantity / ((item.lowStockThreshold || 5) * 3)) * 100, 100))}%` }"
                     />
                   </div>
                 </div>

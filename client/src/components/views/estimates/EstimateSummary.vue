@@ -25,6 +25,14 @@ const props = defineProps({
   itemsCount: {
     type: Number,
     default: 0
+  },
+  showExpiry: {
+    type: Boolean,
+    default: true
+  },
+  title: {
+    type: String,
+    default: 'Estimate Summary'
   }
 })
 
@@ -39,7 +47,7 @@ const handleDateChange = (e) => {
     <Card class="bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-md">
         <CardHeader class="pb-4 border-b">
             <CardTitle class="text-base flex items-center gap-2">
-                <FileText class="w-4 h-4 text-primary"/> Estimate Summary
+                <FileText class="w-4 h-4 text-primary"/> {{ title }}
             </CardTitle>
         </CardHeader>
         <CardContent class="pt-6 space-y-5">
@@ -62,7 +70,7 @@ const handleDateChange = (e) => {
                 <span class="text-2xl font-bold text-primary tracking-tight">₱{{ grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
             </div>
 
-            <div class="pt-4 space-y-3">
+            <div v-if="showExpiry" class="pt-4 space-y-3">
                     <div class="grid gap-1.5">
                     <Label class="text-xs font-medium text-muted-foreground">Estimate Expiry</Label>
                     <Input type="date" :value="expiryDate" @input="handleDateChange" class="bg-background" />

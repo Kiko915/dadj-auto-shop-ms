@@ -34,11 +34,13 @@ import {
   Download
 } from 'lucide-vue-next'
 import EstimateDocument from '@/components/estimates/EstimateDocument.vue'
+import ConvertToOrderDialog from '@/components/estimates/ConvertToOrderDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const estimate = ref(null)
 const loading = ref(true)
+const showConvertDialog = ref(false)
 
 // --- Actions ---
 
@@ -58,6 +60,14 @@ const fetchData = async () => {
 
 const handleStatusUpdate = async (status) => {
     if (!estimate.value) return
+    
+    // If approving, open conversion dialog instead of direct update
+    // Note: The dialog will handle the actual approval + creation
+    if (status === 'APPROVED') {
+        showConvertDialog.value = true
+        return
+    }
+
     try {
         const updated = await updateEstimateStatus(estimate.value.id, status)
         estimate.value = updated.estimate // Update local state with response
@@ -66,6 +76,12 @@ const handleStatusUpdate = async (status) => {
         console.error('Update status error', error)
         toast.error('Failed to update status')
     }
+}
+
+const handleConversionSuccess = () => {
+    // Refresh data to show updated status (APPROVED)
+    fetchData()
+    // Optionally redirect? For now, just refresh to show it's approved.
 }
 
 const handleDownloadPDF = async () => {
@@ -257,6 +273,13 @@ onMounted(fetchData)
 
         <!-- Main Content (Printable Area) -->
         <EstimateDocument id="estimate-pdf-content" :estimate="estimate" />
+
+        <ConvertToOrderDialog 
+            v-if="estimate"
+            v-model:open="showConvertDialog" 
+            :estimate="estimate" 
+            @success="handleConversionSuccess"
+        />
     </div>
 </template>
 

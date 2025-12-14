@@ -6,9 +6,7 @@ import { toast } from 'vue-sonner'
 
 import { getEstimates, getEstimate, getEstimateStats, updateEstimateStatus, deleteEstimate } from '@/api/estimates'
 import EstimateStatsCards from '@/components/views/estimates/EstimateStatsCards.vue'
-import EstimateDocument from '@/components/estimates/EstimateDocument.vue'
-import { toPng } from 'html-to-image'
-import { jsPDF } from 'jspdf'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -44,6 +42,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+
+// Types
+import ConvertToOrderDialog from '@/components/estimates/ConvertToOrderDialog.vue'
 
 // Types
 interface Estimate {
@@ -97,6 +98,11 @@ const estimateToDelete = ref<string | null>(null)
 const deleteDialogOpen = ref(false)
 const tempEstimate = ref(null)
 
+// Conversion Dialog State
+const showConvertDialog = ref(false)
+const estimateToConvert = ref(null)
+const isLoadingEstimate = ref(false)
+
 // Methods
 const fetchData = async () => {
   loading.value = true
@@ -135,7 +141,6 @@ const handleSearch = () => {
   fetchData()
 }
 
-// Debounce search
 // Debounce search
 let searchTimeout: ReturnType<typeof setTimeout> | undefined
 
@@ -184,6 +189,24 @@ const navigateToEdit = (id: string) => {
 }
 
 const handleStatusUpdate = async (id: string, newStatus: string) => {
+    // Intercept Approval to open dialog
+    if (newStatus === 'APPROVED') {
+        isLoadingEstimate.value = true
+        try {
+            // We need full estimate details for the dialog (items, etc.)
+            // The list view only has summary data
+            const fullEstimate = await getEstimate(id)
+            estimateToConvert.value = fullEstimate
+            showConvertDialog.value = true
+        } catch (error) {
+            console.error('Failed to prepare conversion', error)
+            toast.error('Failed to load estimate details')
+        } finally {
+            isLoadingEstimate.value = false
+        }
+        return
+    }
+
     try {
         await updateEstimateStatus(id, newStatus)
         toast.success('Status updated')
@@ -191,6 +214,11 @@ const handleStatusUpdate = async (id: string, newStatus: string) => {
     } catch (error) {
         toast.error('Failed to update status')
     }
+}
+
+const handleConversionSuccess = () => {
+    fetchData()
+    // No explicit close needed if dialog emits update:open=false, but good practice
 }
 
 const handleDelete = (id: string) => {
@@ -214,61 +242,7 @@ const confirmDelete = async () => {
     }
 }
 
-const handleDownloadPDF = async (id: string) => {
-    try {
-        const data = await getEstimate(id)
-        tempEstimate.value = data
-        
-        // Wait for DOM to render the hidden component
-        await nextTick()
-        
-        // Wait for styles/layout to apply (double rAF ensures next paint frame)
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
-        const element = document.getElementById('temp-estimate-pdf')
-        if (!element) throw new Error('Document element not found')
-
-        // Apply scrollbar fix logic
-        const tableContainer = element.querySelector('[data-slot="table-container"]') as HTMLElement
-        let originalOverflow = ''
-        
-        if (tableContainer) {
-            originalOverflow = tableContainer.style.overflow
-            tableContainer.style.overflow = 'visible'
-        }
-
-        const dataUrl = await toPng(element, { 
-            backgroundColor: '#ffffff', 
-            pixelRatio: 2,
-            width: element.scrollWidth,
-            height: element.scrollHeight
-        })
-
-        if (tableContainer) {
-            tableContainer.style.overflow = originalOverflow
-        }
-
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        })
-
-        const imgProps = pdf.getImageProperties(dataUrl)
-        const pdfWidth = pdf.internal.pageSize.getWidth()
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width
-        
-        pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight)
-        pdf.save(`Estimate_${id}.pdf`)
-        toast.success('PDF downloaded successfully')
-
-    } catch (error) {
-        console.error('PDF generation error', error)
-        toast.error('Failed to generate PDF')
-    } finally {
-        tempEstimate.value = null // Cleanup
-    }
-}
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-PH', {
@@ -437,8 +411,9 @@ onMounted(fetchData)
                   <DropdownMenuItem 
                     v-if="estimate.status === 'DRAFT' || estimate.status === 'PENDING'"
                     @click="handleStatusUpdate(estimate.id, 'APPROVED')"
+                    :disabled="isLoadingEstimate"
                   >
-                    Mark as Approved
+                    {{ isLoadingEstimate ? 'Processing...' : 'Mark as Approved' }}
                   </DropdownMenuItem>
                    <DropdownMenuItem 
                     v-if="estimate.status === 'DRAFT'"
@@ -453,7 +428,7 @@ onMounted(fetchData)
                     Mark as Declined
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem @click="handleDownloadPDF(estimate.id)">Download PDF</DropdownMenuItem>
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     @click="handleDelete(estimate.id)"
@@ -513,12 +488,13 @@ onMounted(fetchData)
     </DialogContent>
   </Dialog>
 
-    <!-- Hidden Container for PDF Generation -->
-    <div class="fixed left-[-9999px] top-0 overflow-visible w-[800px]"> <!-- Fixed width to simulate A4 aspect ratio approx -->
-        <EstimateDocument 
-            v-if="tempEstimate" 
-            id="temp-estimate-pdf" 
-            :estimate="tempEstimate"
-        />
-    </div>
+
+
+    <!-- Convert Dialog -->
+    <ConvertToOrderDialog 
+        v-if="estimateToConvert"
+        v-model:open="showConvertDialog" 
+        :estimate="estimateToConvert" 
+        @success="handleConversionSuccess"
+    />
 </template>

@@ -41,6 +41,7 @@ const handleClick = () => {
       props.class
     )"
     @click="handleClick"
+    :data-state="isActive ? 'active' : 'inactive'"
   >
     <slot />
   </button>

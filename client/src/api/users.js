@@ -96,3 +96,16 @@ export const activateUser = async (userId) => {
         throw error
     }
 }
+
+/**
+ * Get all mechanics
+ * @returns {Promise} Response with mechanics array
+ */
+export const getMechanics = async () => {
+    try {
+        const response = await api.get('/users/mechanics')
+        return response.data
+    } catch (error) {
+        throw error
+    }
+}

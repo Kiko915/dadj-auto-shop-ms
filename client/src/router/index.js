@@ -90,6 +90,16 @@ const router = createRouter({
           name: 'estimate-details',
           component: () => import('@/pages/dashboard/estimates/[id].vue'),
         },
+        {
+          path: 'service-orders/new',
+          name: 'new-service-order',
+          component: () => import('@/pages/dashboard/service-orders/new.vue'),
+        },
+        {
+          path: 'service-orders',
+          name: 'service-orders',
+          component: () => import('@/pages/dashboard/service-orders/index.vue'),
+        },
         // Admin routes
         {
           path: 'admin/users',

@@ -37,8 +37,10 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  passwordResets PasswordReset[]
-  sessions       UserSession[]
+  passwordResets        PasswordReset[]
+  sessions              UserSession[]
+  mechanicServiceOrders ServiceOrder[]  @relation("MechanicServiceOrders")
+  serviceOrders         ServiceOrder[]  @relation("UserServiceOrders")
 
   @@map("users")
 }
@@ -181,7 +183,6 @@ enum OrderStatus {
 enum PaymentMethod {
   CASH
   GCASH
-  BANK_TRANSFER
   OTHER
 }
 
@@ -287,10 +288,43 @@ model ServiceOrder {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   estimatedCompletion DateTime? @map("estimated_completion")
+  notes               String?   @map("notes") @db.Text
+
+  // Mechanic Assignment
+  mechanicId String? @map("mechanic_id")
+  mechanic   User?   @relation("MechanicServiceOrders", fields: [mechanicId], references: [id])
+
+  // Vehicle Snapshot
+  odometer Int?
+  user     User?   @relation("UserServiceOrders", fields: [userId], references: [id])
+  userId   String?
+
+  advisories ServiceOrderAdvisory[]
 
   @@index([customerId])
   @@index([vehicleId])
   @@map("service_orders")
+}
+
+model ServiceOrderAdvisory {
+  id      String @id @default(cuid()) @map("advisory_id")
+  orderId String @map("order_id")
+
+  content  String @db.Text
+  severity String @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+
+  // Evidence
+  imageUrl    String? @map("image_url")
+  imageFileId String? @map("image_file_id") // ImageKit ID
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("service_order_advisories")
 }
 
 model ServiceOrderItem {
