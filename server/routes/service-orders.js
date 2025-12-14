@@ -885,4 +885,114 @@ router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), asy
     }
 });
 
+
+/**
+ * @route GET /api/service-orders/:id/notes
+ * @desc Get all notes for a service order
+ * @access Staff, Admin
+ */
+router.get('/:id/notes', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const notes = await prisma.serviceOrderNote.findMany({
+            where: { orderId: id },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(notes);
+    } catch (error) {
+        console.error('Get Notes Error:', error);
+        res.status(500).json({ message: 'Failed to fetch notes' });
+    }
+});
+
+/**
+ * @route POST /api/service-orders/:id/notes
+ * @desc Add a note to a service order
+ * @access Staff, Admin
+ */
+router.post('/:id/notes', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { content } = req.body;
+
+        if (!content) {
+            return res.status(400).json({ message: 'Content is required' });
+        }
+
+        const note = await prisma.serviceOrderNote.create({
+            data: {
+                orderId: id,
+                content
+            }
+        });
+
+        res.status(201).json(note);
+    } catch (error) {
+        console.error('Add Note Error:', error);
+        res.status(500).json({ message: 'Failed to add note' });
+    }
+});
+
+/**
+ * @route PUT /api/service-orders/:id/notes/:noteId
+ * @desc Update a service order note
+ * @access Staff, Admin
+ */
+router.put('/:id/notes/:noteId', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id, noteId } = req.params;
+        const { content } = req.body;
+
+        if (!content) {
+            return res.status(400).json({ message: 'Content is required' });
+        }
+
+        const note = await prisma.serviceOrderNote.findUnique({
+            where: { id: noteId }
+        });
+
+        if (!note || note.orderId !== id) {
+            return res.status(404).json({ message: 'Note not found or does not belong to this order' });
+        }
+
+        const updatedNote = await prisma.serviceOrderNote.update({
+            where: { id: noteId },
+            data: { content }
+        });
+
+        res.json(updatedNote);
+    } catch (error) {
+        console.error('Update Note Error:', error);
+        res.status(500).json({ message: 'Failed to update note' });
+    }
+});
+
+/**
+ * @route DELETE /api/service-orders/:id/notes/:noteId
+ * @desc Delete a service order note
+ * @access Staff, Admin
+ */
+router.delete('/:id/notes/:noteId', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id, noteId } = req.params;
+
+        const note = await prisma.serviceOrderNote.findUnique({
+            where: { id: noteId }
+        });
+
+        if (!note || note.orderId !== id) {
+            return res.status(404).json({ message: 'Note not found or does not belong to this order' });
+        }
+
+        await prisma.serviceOrderNote.delete({
+            where: { id: noteId }
+        });
+
+        res.json({ message: 'Note deleted successfully' });
+    } catch (error) {
+        console.error('Delete Note Error:', error);
+        res.status(500).json({ message: 'Failed to delete note' });
+    }
+});
+
 export default router;

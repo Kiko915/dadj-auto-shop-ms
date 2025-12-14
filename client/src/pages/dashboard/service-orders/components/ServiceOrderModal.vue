@@ -41,6 +41,7 @@ import { formatDate, formatCurrency, getInitials, getStatusVariant, COLUMNS } fr
 import ServiceOrderLabor from './ServiceOrderLabor.vue'
 import ServiceOrderParts from './ServiceOrderParts.vue'
 import ServiceOrderAdvisory from './ServiceOrderAdvisory.vue'
+import ServiceOrderNotes from './ServiceOrderNotes.vue'
 
 const props = defineProps<{
     open: boolean,
@@ -432,12 +433,7 @@ const isDueSoon = (dateString: string | Date | null) => {
                                 </div>
 
                                 <!-- Notes -->
-                                <div class="space-y-2" v-if="order.notes">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 pl-1">Notes</label>
-                                    <div class="bg-amber-50/50 rounded-xl p-4 border border-amber-100/50 text-sm text-slate-700 leading-relaxed shadow-sm">
-                                        {{ order.notes }}
-                                    </div>
-                                </div>
+                                <ServiceOrderNotes :orderId="order.id" />
                             </div>
 
                         </div>
