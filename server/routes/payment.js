@@ -9,6 +9,9 @@ const transporter = nodemailer.createTransport({
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
 
@@ -83,10 +86,10 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
             });
 
             // Calculate new totals
-            const newAmountPaid = Number(order.amountPaid) + paymentAmount;
+            const newAmountPaid = Number(freshOrder.amountPaid) + paymentAmount;
 
             // Determine Status
-            const newStatus = (newAmountPaid >= Number(order.totalAmount) - 0.01) ? 'PAID' : 'PARTIAL';
+            const newStatus = (newAmountPaid >= Number(freshOrder.totalAmount) - 0.01) ? 'PAID' : 'PARTIAL';
 
             // Update Service Order
             const updatedOrder = await tx.serviceOrder.update({
@@ -250,10 +253,10 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
                     };
 
                     await transporter.sendMail(mailOptions);
-                    console.log(`Receipt email sent to ${order.customer.email}`);
+                    console.log(`Receipt email sent for orderId=${orderId}`);
 
                 } catch (emailError) {
-                    console.error('Failed to send receipt email:', emailError);
+                    console.error(`Failed to send receipt email for orderId=${orderId}:`, emailError);
                     // Do not fail the request, just log it
                 }
             })();
