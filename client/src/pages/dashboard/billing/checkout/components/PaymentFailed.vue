@@ -17,7 +17,7 @@ defineEmits(['retry', 'cancel'])
         
         <div class="text-center space-y-2">
             <h2 class="text-3xl font-black text-slate-900 tracking-tight">Payment Failed</h2>
-            <p class="text-slate-500 text-lg">Something went wrong processed the transaction.</p>
+            <p class="text-slate-500 text-lg">Something went wrong processing the transaction.</p>
             <p class="text-xs text-red-500 bg-red-50 px-3 py-1 rounded border border-red-100 font-mono">{{ errorMessage }}</p>
         </div>
 

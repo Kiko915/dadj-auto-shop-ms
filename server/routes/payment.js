@@ -2,10 +2,20 @@ import express from 'express';
 import prisma from '../db.js';
 import nodemailer from 'nodemailer';
 
+import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+    }
+});
+
 const router = express.Router();
 
 // POST /api/payments
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (req, res) => {
     try {
         const { orderId, amount, method, referenceNo } = req.body;
 
@@ -47,13 +57,20 @@ router.post('/', async (req, res) => {
 
         const currentBalance = Number(order.totalAmount) - Number(order.amountPaid);
 
-        // Allow a small margin of error for floating point comparison if needed, but assuming strict for now
-        if (paymentAmount > currentBalance + 0.01) { // +0.01 tolerance
-            return res.status(400).json({ error: 'Payment amount exceeds balance' });
-        }
 
         // 2. Process Payment in Transaction
         const result = await prisma.$transaction(async (tx) => {
+            // Re-fetch order inside transaction for atomicity
+            const freshOrder = await tx.serviceOrder.findUnique({
+                where: { id: orderId },
+                select: { totalAmount: true, amountPaid: true }
+            });
+
+            const currentBalance = Number(freshOrder.totalAmount) - Number(freshOrder.amountPaid);
+            if (paymentAmount > currentBalance + 0.01) {
+                throw new Error('Payment amount exceeds balance');
+            }
+
             // Create Payment Record
             const payment = await tx.payment.create({
                 data: {
@@ -69,12 +86,7 @@ router.post('/', async (req, res) => {
             const newAmountPaid = Number(order.amountPaid) + paymentAmount;
 
             // Determine Status
-            let newStatus = 'PARTIAL';
-            if (newAmountPaid >= Number(order.totalAmount) - 0.01) {
-                newStatus = 'PAID';
-            } else if (newAmountPaid === 0) {
-                newStatus = 'UNPAID';
-            }
+            const newStatus = (newAmountPaid >= Number(order.totalAmount) - 0.01) ? 'PAID' : 'PARTIAL';
 
             // Update Service Order
             const updatedOrder = await tx.serviceOrder.update({
@@ -93,17 +105,6 @@ router.post('/', async (req, res) => {
         if (order.customer?.email) {
             (async () => {
                 try {
-                    const transporter = nodemailer.createTransport({
-                        service: 'gmail',
-                        auth: {
-                            user: process.env.EMAIL_USER,
-                            pass: process.env.EMAIL_PASSWORD
-                        },
-                        tls: {
-                            rejectUnauthorized: false
-                        }
-                    });
-
                     // Recalculate based on updated values
                     const totalAmount = Number(order.totalAmount);
                     const amountPaidSoFar = Number(result.updatedOrder.amountPaid);
@@ -262,6 +263,9 @@ router.post('/', async (req, res) => {
 
     } catch (error) {
         console.error('Payment processing error:', error);
+        if (error.message === 'Payment amount exceeds balance') {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Failed to process payment' });
     }
 });
