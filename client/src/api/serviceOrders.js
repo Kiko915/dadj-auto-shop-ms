@@ -152,3 +152,40 @@ export const deleteServiceOrderAdvisory = async (serviceOrderId, advisoryId) => 
     throw error
   }
 }
+
+// Notes
+export const getServiceOrderNotes = async (serviceOrderId) => {
+  try {
+    const response = await api.get(`/service-orders/${serviceOrderId}/notes`)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const addServiceOrderNote = async (serviceOrderId, content) => {
+  try {
+    const response = await api.post(`/service-orders/${serviceOrderId}/notes`, { content })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const updateServiceOrderNote = async (serviceOrderId, noteId, content) => {
+  try {
+    const response = await api.put(`/service-orders/${serviceOrderId}/notes/${noteId}`, { content })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const deleteServiceOrderNote = async (serviceOrderId, noteId) => {
+  try {
+    const response = await api.delete(`/service-orders/${serviceOrderId}/notes/${noteId}`)
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}

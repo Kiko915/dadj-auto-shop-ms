@@ -299,7 +299,8 @@ model ServiceOrder {
   user     User?   @relation("UserServiceOrders", fields: [userId], references: [id])
   userId   String?
 
-  advisories ServiceOrderAdvisory[]
+  advisories  ServiceOrderAdvisory[]
+  noteEntries ServiceOrderNote[]
 
   @@index([customerId])
   @@index([vehicleId])
@@ -381,4 +382,15 @@ model ServiceOrderAttachment {
   order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("service_order_attachments")
+}
+
+model ServiceOrderNote {
+  id        String       @id @default(cuid()) @map("note_id")
+  orderId   String       @map("order_id")
+  order     ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  content   String       @db.Text
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@map("service_order_notes")
 }
