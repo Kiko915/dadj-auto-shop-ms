@@ -20,11 +20,12 @@ const props = defineProps<{
 
 const notes = ref<any[]>([])
 const loading = ref(false)
-const isAdding = ref(false)
+const isAdding = ref<boolean | 'loading'>(false)
 const newNoteContent = ref('')
 
 const isEditing = ref<string | null>(null)
 const editContent = ref('')
+const isSaving = ref(false)
 
 const deleteId = ref<string | null>(null)
 const isDeleting = ref(false)
@@ -45,7 +46,9 @@ watch(() => props.orderId, fetchNotes, { immediate: true })
 
 const handleAddNote = async () => {
     if (!newNoteContent.value.trim()) return
+    if (isAdding.value === 'loading') return
 
+    isAdding.value = 'loading'
     try {
         await addServiceOrderNote(props.orderId, newNoteContent.value)
         newNoteContent.value = ''
@@ -55,6 +58,7 @@ const handleAddNote = async () => {
     } catch (error) {
         console.error('Failed to add note', error)
         toast.error('Failed to add note')
+        isAdding.value = true // Revert to adding state on error
     }
 }
 
@@ -62,7 +66,6 @@ const startEdit = (note: any) => {
     isEditing.value = note.id
     editContent.value = note.content
 }
-
 const cancelEdit = () => {
     isEditing.value = null
     editContent.value = ''
@@ -70,7 +73,9 @@ const cancelEdit = () => {
 
 const saveEdit = async (noteId: string) => {
     if (!editContent.value.trim()) return
+    if (isSaving.value) return
 
+    isSaving.value = true
     try {
         await updateServiceOrderNote(props.orderId, noteId, editContent.value)
         isEditing.value = null
@@ -79,6 +84,8 @@ const saveEdit = async (noteId: string) => {
     } catch (error) {
         console.error('Failed to update note', error)
         toast.error('Failed to update note')
+    } finally {
+        isSaving.value = false
     }
 }
 
@@ -102,7 +109,6 @@ const handleDelete = async () => {
     }
 }
 </script>
-
 <template>
     <div class="space-y-3">
         <div class="flex items-center justify-between">
@@ -128,10 +134,14 @@ const handleDelete = async () => {
                 placeholder="Type note..." 
                 class="min-h-[60px] text-xs resize-none mb-2 focus-visible:ring-1"
                 autofocus
+                :disabled="isAdding === 'loading'"
             />
             <div class="flex justify-end gap-1">
-                <Button variant="ghost" class="h-6 px-2 text-xs" @click="isAdding = false">Cancel</Button>
-                <Button class="h-6 px-2 text-xs" @click="handleAddNote" :disabled="!newNoteContent.trim()">Save</Button>
+                <Button variant="ghost" class="h-6 px-2 text-xs" @click="isAdding = false" :disabled="isAdding === 'loading'">Cancel</Button>
+                <Button class="h-6 px-2 text-xs" @click="handleAddNote" :disabled="!newNoteContent.trim() || isAdding === 'loading'">
+                    <Loader2 v-if="isAdding === 'loading'" class="h-3 w-3 animate-spin mr-1" />
+                    {{ isAdding === 'loading' ? 'Saving...' : 'Save' }}
+                </Button>
             </div>
         </div>
 
@@ -155,8 +165,11 @@ const handleDelete = async () => {
                         class="min-h-[60px] text-xs resize-none mb-2 bg-white"
                     />
                     <div class="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" class="h-5 w-5" @click="cancelEdit" type="button"><X class="h-3 w-3" /></Button>
-                        <Button size="icon" variant="ghost" class="h-5 w-5 text-green-600" @click="saveEdit(note.id)" type="button"><Check class="h-3 w-3" /></Button>
+                        <Button size="icon" variant="ghost" class="h-5 w-5" @click="cancelEdit" type="button" :disabled="isSaving"><X class="h-3 w-3" /></Button>
+                        <Button size="icon" variant="ghost" class="h-5 w-5 text-green-600" @click="saveEdit(note.id)" type="button" :disabled="isSaving">
+                            <Loader2 v-if="isSaving" class="h-3 w-3 animate-spin" />
+                            <Check v-else class="h-3 w-3" />
+                        </Button>
                     </div>
                 </template>
 
