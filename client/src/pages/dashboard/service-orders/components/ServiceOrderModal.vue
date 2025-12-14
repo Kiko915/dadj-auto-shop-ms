@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { 
     Calendar, 
@@ -53,8 +54,9 @@ const emit = defineEmits(['update:open', 'order-updated'])
 
 
 const loading = ref(false)
-const order = ref<any>(null) // Using any for now to handle expanded relations not in list type
-const mechanics = ref<any[]>([])
+const order = ref(null) // Using any for now to handle expanded relations not in list type
+const mechanics = ref([])
+const router = useRouter()
 
 const isArchiving = ref(false)
 const showArchiveConfirm = ref(false)
@@ -221,6 +223,13 @@ const isDueSoon = (dateString: string | Date | null) => {
     const threeDaysFromNow = new Date()
     threeDaysFromNow.setDate(today.getDate() + 3)
     return date > today && date <= threeDaysFromNow
+}
+
+const handlePayNow = () => {
+    if (order.value?.id) {
+        emit('update:open', false) // Close modal
+        router.push(`/dashboard/billing/checkout/${order.value.id}`)
+    }
 }
 
 </script>
@@ -492,7 +501,7 @@ const isDueSoon = (dateString: string | Date | null) => {
                                     <CheckCircle class="h-4 w-4" />
                                     Paid in Full
                                 </div>
-                                <Button v-else class="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all">
+                                <Button v-else class="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all" @click="handlePayNow">
                                     <CreditCard class="h-4 w-4 mr-2" />
                                     {{ order.paymentStatus === 'PARTIAL' ? 'Pay Balance' : 'Pay Now' }}
                                 </Button>
