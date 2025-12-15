@@ -101,6 +101,11 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/service-orders/index.vue'),
         },
         {
+          path: 'service-history',
+          name: 'service-history',
+          component: () => import('@/pages/dashboard/service-history/index.vue'),
+        },
+        {
           path: 'billing',
           name: 'billing',
           component: () => import('@/pages/dashboard/billing/index.vue'),
