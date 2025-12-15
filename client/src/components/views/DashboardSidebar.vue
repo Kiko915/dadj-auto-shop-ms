@@ -155,7 +155,6 @@ const navigationItems = [
             title: 'Service History',
             url: '/dashboard/service-history',
             description: 'Completed vehicle history',
-            comingSoon: true
           },
         ]
       },

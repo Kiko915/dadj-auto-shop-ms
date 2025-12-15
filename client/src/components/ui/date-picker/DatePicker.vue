@@ -31,14 +31,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  dateStyle: {
+    type: String,
+    default: 'long',
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 // Date formatter for display
-const df = new DateFormatter('en-US', {
-  dateStyle: 'long',
-});
+const df = computed(() => new DateFormatter('en-US', {
+  dateStyle: props.dateStyle,
+}));
 
 // Convert JavaScript Date to CalendarDate
 const toCalendarDate = (date) => {
@@ -117,7 +121,7 @@ const selectedYear = computed({
 
 const formatDate = (date) => {
   if (!date) return null;
-  return df.format(toJSDate(date));
+  return df.value.format(toJSDate(date));
 };
 
 const goToPreviousMonth = () => {

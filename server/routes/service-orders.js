@@ -90,6 +90,23 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
             }
         }
 
+        // Custom Date Range (startDate, endDate)
+        const { startDate, endDate } = req.query;
+        if (startDate || endDate) {
+            where.updatedAt = where.updatedAt || {}; // Initialize if not present
+
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                where.updatedAt.gte = start;
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                where.updatedAt.lte = end;
+            }
+        }
+
         const [orders, total] = await prisma.$transaction([
             prisma.serviceOrder.findMany({
                 where,
