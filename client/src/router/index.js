@@ -101,6 +101,11 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/service-orders/index.vue'),
         },
         {
+          path: 'billing',
+          name: 'billing',
+          component: () => import('@/pages/dashboard/billing/index.vue'),
+        },
+        {
           path: 'billing/checkout/:orderId',
           name: 'checkout',
           component: () => import('@/pages/dashboard/billing/checkout/[id].vue'),

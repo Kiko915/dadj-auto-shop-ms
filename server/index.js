@@ -19,6 +19,7 @@ import estimateRoutes from './routes/estimates.js';
 import usersRoutes from './routes/users.js';
 import serviceRoutes from './routes/service-orders.js';
 import paymentRoutes from './routes/payment.js';
+import financialReports from './routes/financial-reports.js';
 
 // --- Initialization ---
 const app = express();
@@ -46,14 +47,15 @@ app.use(express.json());
 app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/protected', protectedRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/estimates', estimateRoutes);
-app.use('/api/files', filesRoutes);
-app.use('/api/users', usersRoutes);
 app.use('/api/service-orders', serviceRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/files', filesRoutes);
+app.use('/api/reports', financialReports);
 
 app.listen(PORT, () => {
     // Use template literals for cleaner console logging

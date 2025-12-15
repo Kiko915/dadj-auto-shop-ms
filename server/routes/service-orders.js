@@ -48,7 +48,11 @@ router.get('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (re
         }
 
         if (status && status !== 'ALL') {
-            where.status = status;
+            if (status.includes(',')) {
+                where.status = { in: status.split(',') };
+            } else {
+                where.status = status;
+            }
         }
 
         // Mechanic Filter (by Name)
