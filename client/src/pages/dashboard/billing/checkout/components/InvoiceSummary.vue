@@ -100,6 +100,10 @@ const router = useRouter()
                             <span class="text-slate-500 font-medium">Parts & Materials</span>
                             <span class="font-mono text-slate-700">{{ formatCurrency(order?.partsTotal || 0) }}</span>
                         </div>
+                        <div v-if="order?.discount > 0" class="flex justify-between text-sm text-red-500">
+                             <span class="font-medium">Discount {{ order.discountReason ? `(${order.discountReason})` : '' }}</span>
+                             <span class="font-mono font-medium">- {{ formatCurrency(order?.discount || 0) }}</span>
+                        </div>
                         
                         <Separator class="my-2" />
                         

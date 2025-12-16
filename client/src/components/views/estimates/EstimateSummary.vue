@@ -33,6 +33,14 @@ const props = defineProps({
   title: {
     type: String,
     default: 'Estimate Summary'
+  },
+  discount: {
+    type: Number,
+    default: 0
+  },
+  discountReason: {
+    type: String,
+    default: ''
   }
 })
 
@@ -60,6 +68,10 @@ const handleDateChange = (e) => {
                 <div class="flex justify-between text-sm">
                     <span class="text-muted-foreground">Parts Subtotal</span>
                     <span class="font-medium">₱{{ partsTotal.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+                </div>
+                <div v-if="discount > 0" class="flex justify-between text-sm text-red-500">
+                    <span>Discount {{ discountReason ? `(${discountReason})` : '' }}</span>
+                    <span class="font-medium">- ₱{{ discount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
                 </div>
             </div>
             

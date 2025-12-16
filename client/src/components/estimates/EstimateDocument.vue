@@ -165,6 +165,10 @@ const items = computed(() => {
                     <span class="text-muted-foreground">Parts Total:</span>
                     <span>{{ formatCurrency(estimate.partsTotal) }}</span>
                 </div>
+                <div v-if="estimate.discount > 0" class="flex justify-between text-sm text-red-600 font-medium">
+                    <span>Discount {{ estimate.discountReason ? `(${estimate.discountReason})` : '' }}:</span>
+                    <span>- {{ formatCurrency(estimate.discount) }}</span>
+                </div>
                 <div class="border-t pt-3 flex justify-between font-bold text-lg">
                     <span>Grand Total:</span>
                     <span>{{ formatCurrency(estimate.totalAmount) }}</span>

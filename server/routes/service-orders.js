@@ -236,7 +236,20 @@ router.get('/:id/receipt', authenticateToken, authorizeRoles(['staff', 'admin'])
  */
 router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
-        const { estimateId, mechanicId, odometer, estimatedCompletion, customerId, vehicleId, items, partsTotal, laborTotal, totalAmount } = req.body;
+        const {
+            estimateId,
+            mechanicId,
+            odometer,
+            estimatedCompletion,
+            customerId,
+            vehicleId,
+            items,
+            partsTotal,
+            laborTotal,
+            totalAmount,
+            discount,
+            discountReason
+        } = req.body;
 
         let sourceData = {};
 
@@ -251,13 +264,24 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 return res.status(404).json({ message: 'Estimate not found' });
             }
 
+            // Security: Recalculate totals from estimate to ensure base integrity, but apply new discount if provided
+            const baseTotal = Number(estimate.laborTotal) + Number(estimate.partsTotal);
+            const discountVal = discount ? parseFloat(discount) : 0;
+            const finalTotal = Math.max(0, baseTotal - discountVal);
+
+            if (discountVal > baseTotal) {
+                return res.status(400).json({ message: 'Discount cannot exceed total amount' });
+            }
+
             sourceData = {
                 customerId: estimate.customerId,
                 vehicleId: estimate.vehicleId,
                 items: estimate.items, // EstimateItems
                 partsTotal: estimate.partsTotal,
                 laborTotal: estimate.laborTotal,
-                totalAmount: estimate.totalAmount,
+                discount: discountVal,
+                discountReason: discountReason,
+                totalAmount: finalTotal,
                 currentMileage: estimate.vehicle.mileage || 0,
                 sourceEstimateId: estimate.id
             };
@@ -271,13 +295,26 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
             if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
 
+            // Direct Calculation
+            const pTotal = parseFloat(partsTotal || 0);
+            const lTotal = parseFloat(laborTotal || 0);
+            const baseTotal = pTotal + lTotal;
+            const discountVal = discount ? parseFloat(discount) : 0;
+            const finalTotal = Math.max(0, baseTotal - discountVal);
+
+            if (discountVal > baseTotal) {
+                return res.status(400).json({ message: 'Discount cannot exceed total amount' });
+            }
+
             sourceData = {
                 customerId,
                 vehicleId,
                 items, // Raw items from body
-                partsTotal: partsTotal || 0,
-                laborTotal: laborTotal || 0,
-                totalAmount: totalAmount || 0,
+                partsTotal: pTotal,
+                laborTotal: lTotal,
+                discount: discountVal,
+                discountReason: discountReason,
+                totalAmount: finalTotal,
                 currentMileage: vehicle.mileage || 0,
                 sourceEstimateId: null
             };
@@ -373,6 +410,8 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                             notes: orderNotes,
                             laborTotal: sourceData.laborTotal,
                             partsTotal: sourceData.partsTotal,
+                            discount: sourceData.discount,
+                            discountReason: sourceData.discountReason,
                             totalAmount: sourceData.totalAmount,
                             items: {
                                 create: orderItems

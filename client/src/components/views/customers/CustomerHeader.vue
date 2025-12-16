@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, Mail, Car, History, Edit, Plus, DollarSign } from 'lucide-vue-next'
+import { Phone, Mail, Car, History, Edit, Plus, DollarSign, Gift, Crown, Star } from 'lucide-vue-next'
 
 type Customer = {
   id: string
@@ -14,6 +14,7 @@ type Customer = {
   suffix?: string | null
   phoneNumber: string
   email: string
+  birthday?: string | null
   profilePicture?: string | null
   loyaltyStatus: 'Loyal' | 'Regular' | 'VIP'
   totalVehicles: number
@@ -55,6 +56,14 @@ const loyaltyColor = computed(() => {
   }
 })
 
+const isBirthdayToday = computed(() => {
+  if (!props.customer.birthday) return false
+  // Parse as local date by splitting the ISO string to avoid UTC conversion issues
+  const [year, month, day] = props.customer.birthday.split('T')[0].split('-').map(Number)
+  const today = new Date()
+  return day === today.getDate() && month === today.getMonth() + 1
+})
+
 const formattedTotalSpent = computed(() => {
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -74,11 +83,25 @@ const formattedTotalSpent = computed(() => {
         <div class="flex-1 space-y-2">
           <div class="flex items-center gap-3">
             <h2 class="text-2xl font-bold">{{ fullName }}</h2>
-            <Badge :variant="loyaltyColor === 'purple' ? 'default' : 'secondary'" :class="{
-              'bg-purple-100 text-purple-800': loyaltyColor === 'purple',
-              'bg-amber-100 text-amber-800': loyaltyColor === 'amber',
-            }">
-              {{ customer.loyaltyStatus }}
+            <!-- VIP Badge -->
+            <Badge v-if="customer.loyaltyStatus?.toLowerCase() === 'vip'" class="bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-0 shadow-sm gap-1.5 pl-1.5 pr-2.5">
+              <Crown class="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+              VIP Member
+            </Badge>
+
+            <!-- Loyal Badge -->
+            <Badge v-else-if="customer.loyaltyStatus?.toLowerCase() === 'loyal'" variant="secondary" class="bg-amber-100 text-amber-700 border-amber-200 gap-1.5 pl-1.5 pr-2.5">
+              <Star class="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              Loyal Customer
+            </Badge>
+
+            <!-- Regular Badge -->
+            <Badge v-else variant="outline" class="text-slate-500 border-slate-200 bg-slate-50">
+              Regular
+            </Badge>
+            <Badge v-if="isBirthdayToday" variant="secondary" class="bg-pink-100 text-pink-600 gap-1 pl-1.5 pr-2.5">
+              <Gift class="w-3.5 h-3.5" />
+              Birthday Today!
             </Badge>
           </div>
           <div class="flex flex-wrap gap-4 text-sm text-muted-foreground">

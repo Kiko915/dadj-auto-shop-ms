@@ -23,6 +23,7 @@ type Customer = {
   suffix?: string | null
   phoneNumber: string
   email: string
+  birthday?: string | null
   profilePicture?: string | null
   loyaltyStatus: 'Loyal' | 'Regular' | 'VIP'
   totalVehicles: number

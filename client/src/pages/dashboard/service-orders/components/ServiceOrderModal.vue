@@ -604,6 +604,15 @@ const handlePayNow = () => {
                                                         </span>
                                                         <span class="font-medium font-mono">{{ formatCurrency(order.partsTotal) }}</span>
                                                     </div>
+                                                    <div v-if="order.discount > 0" class="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-slate-50 transition-colors text-red-600">
+                                                        <span class="flex items-center gap-2 font-medium">
+                                                            <div class="w-4 h-4 flex items-center justify-center">
+                                                                <span class="text-xs font-bold">%</span>
+                                                            </div>
+                                                            Discount {{ order.discountReason ? `(${order.discountReason})` : '' }}
+                                                        </span>
+                                                        <span class="font-medium font-mono">- {{ formatCurrency(order.discount) }}</span>
+                                                    </div>
                                                 </div>
                                                 
                                                 <Separator class="bg-slate-200" />
