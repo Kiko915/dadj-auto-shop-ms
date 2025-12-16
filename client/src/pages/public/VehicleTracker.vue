@@ -228,7 +228,6 @@ const isLoading = ref(false)
 
 const steps = [
     { title: 'Order Received', description: 'We have received your vehicle and details.' },
-    { title: 'Diagnosis & Inspection', description: 'Our team is assessing the repair requirements.' },
     { title: 'Work in Progress', description: 'Technicians are actively performing the repairs.' },
     { title: 'Ready for Pickup', description: 'Final quality check complete. Come get your car!' }
 ]
@@ -236,8 +235,8 @@ const steps = [
 const currentStepIndex = computed(() => {
     if (!trackingResult.value) return 0
     const s = trackingResult.value.status
-    if (s === 'COMPLETED') return 3
-    if (s === 'IN_PROGRESS') return 2 
+    if (s === 'COMPLETED') return 2
+    if (s === 'IN_PROGRESS') return 1 
     if (s === 'PENDING') return 0
     if (s === 'CANCELLED') return -1
     return 0

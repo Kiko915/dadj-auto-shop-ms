@@ -1,5 +1,6 @@
 import express from 'express';
 import prisma from '../db.js';
+import { rateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ const router = express.Router();
  * @description Track a Service Order by ID and Plate Number (Public Access)
  * @access Public
  */
-router.get('/track-order', async (req, res) => {
+router.get('/track-order', rateLimiter({ windowMs: 60 * 1000, max: 10 }), async (req, res) => {
     try {
         const { orderId, plateNumber } = req.query;
 
@@ -32,38 +33,29 @@ router.get('/track-order', async (req, res) => {
                         year: true,
                         color: true
                     }
-                },
-                customer: {
-                    select: {
-                        firstName: true // Optional: Just to say "Hi [Name]" if needed, but maybe safer to omit
-                    }
-                },
-                items: {
-                    select: {
-                        name: true,
-                        quantity: true,
-                        total: true
-                    }
                 }
             }
         });
 
-        // 1. Check if order exists
-        if (!order) {
+        // 1. Check if order exists and has valid vehicle info
+        if (!order || !order.vehicle?.licensePlate) {
             // Generic error to prevent enumeration
             return res.status(404).json({ error: 'Service Order not found or details incorrect.' });
         }
 
         // 2. Verify Plate Number (Case Insensitive)
         const dbPlate = order.vehicle.licensePlate.replace(/\s+/g, '').toUpperCase();
-        const inputPlate = plateNumber.replace(/\s+/g, '').toUpperCase();
+        const inputPlate = String(plateNumber).replace(/\s+/g, '').toUpperCase();
 
         if (dbPlate !== inputPlate) {
             return res.status(404).json({ error: 'Service Order not found or details incorrect.' });
         }
 
         // 3. Construct Sanitized Response
-        const maskedPlate = order.vehicle.licensePlate.slice(0, 3) + '***' + order.vehicle.licensePlate.slice(-3);
+        const plate = order.vehicle.licensePlate;
+        const maskedPlate = plate.length >= 6
+            ? plate.slice(0, 3) + '***' + plate.slice(-3)
+            : '***';
 
         const responseData = {
             id: order.id,
