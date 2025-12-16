@@ -35,6 +35,11 @@ const router = createRouter({
       component: () => import('@/pages/auth/ResetPassword.vue')
     },
     {
+      path: '/track',
+      name: 'vehicle-tracker',
+      component: () => import('@/pages/public/VehicleTracker.vue')
+    },
+    {
       path: '/dashboard',
       component: () => import('@/components/views/DashboardLayout.vue'),
       meta: { requiresAuth: true },
