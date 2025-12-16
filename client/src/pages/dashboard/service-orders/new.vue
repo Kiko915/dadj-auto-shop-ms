@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { createServiceOrder } from '@/api/serviceOrders'
+import { getCustomer } from '@/api/customers'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { 
@@ -15,6 +16,7 @@ import EstimateCustomerVehicleSelector from '@/components/views/estimates/Estima
 import EstimateSummary from '@/components/views/estimates/EstimateSummary.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // --- State ---
 
@@ -22,6 +24,21 @@ const selectedCustomer = ref(null)
 const selectedVehicleId = ref('')
 const items = ref([])
 const isSubmitting = ref(false)
+
+// --- Lifecycle ---
+
+onMounted(async () => {
+    const customerId = route.query.customerId
+    if (customerId) {
+        try {
+            const response = await getCustomer(customerId)
+            selectedCustomer.value = response.customer
+        } catch (error) {
+            console.error('Failed to pre-fill customer:', error)
+            toast.error('Failed to load selected customer')
+        }
+    }
+})
 
 // --- Computed ---
 

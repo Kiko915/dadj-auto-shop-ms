@@ -201,6 +201,246 @@ router.get('/brands', authenticateToken, authorizeRoles(['staff', 'admin']), asy
      * @desc Get a single inventory item by ID
      * @access Staff, Admin
      */
+/**
+ * @route GET /api/inventory/reports
+ * @desc Get detailed inventory reports and analytics
+ * @access Staff, Admin
+ */
+router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        // 1. Inventory Value & Low Stock KPI
+        const allItems = await prisma.inventoryItem.findMany({
+            select: {
+                id: true,
+                name: true,
+                quantity: true,
+                buyingPrice: true,
+                sellingPrice: true,
+                lowStockThreshold: true,
+                targetStock: true,
+                category: true,
+                updatedAt: true,
+                brand: true
+            }
+        });
+
+        const inventoryValue = allItems.reduce((sum, item) => sum + (Number(item.buyingPrice) * item.quantity), 0);
+
+        // Low Stock Count (where quantity <= threshold)
+        const lowStockItems = allItems.filter(item => item.quantity <= item.lowStockThreshold);
+        const lowStockCount = lowStockItems.length;
+
+        // 2. Restock Recommendations
+        // Target Stock = item.targetStock || Threshold * 3 (Rule of thumb)
+        const restockList = lowStockItems.map(item => {
+            const maxStock = item.targetStock || (item.lowStockThreshold * 3);
+            return {
+                id: item.id,
+                name: item.name,
+                stock: item.quantity,
+                maxStock: maxStock,
+                costPerUnit: Number(item.buyingPrice),
+                selected: false // For UI checkbox
+            };
+        });
+
+        // 3. Fastest Mover (Top selling item this month)
+        // We look at ServiceOrderItems of type PART linked to orders created/completed this month
+        const topSellingItems = await prisma.serviceOrderItem.groupBy({
+            by: ['inventoryItemId'],
+            where: {
+                type: 'PART',
+                order: {
+                    createdAt: { gte: firstDayOfMonth }
+                },
+                inventoryItemId: { not: null }
+            },
+            _sum: {
+                quantity: true
+            },
+            orderBy: {
+                _sum: {
+                    quantity: 'desc'
+                }
+            },
+            take: 5
+        });
+
+        let fastestMover = { name: "N/A", count: 0 };
+        if (topSellingItems.length > 0 && topSellingItems[0].inventoryItemId) {
+            const bestItem = allItems.find(i => i.id === topSellingItems[0].inventoryItemId);
+            if (bestItem) {
+                fastestMover = {
+                    name: bestItem.name,
+                    count: topSellingItems[0]._sum.quantity
+                };
+            }
+        }
+
+        // 4. Chart Data: Top Selling Parts (This Month)
+        // Reuse topSellingItems from above
+        const topSellingChartLabels = [];
+        const topSellingChartData = [];
+
+        for (const ranked of topSellingItems) {
+            const item = allItems.find(i => i.id === ranked.inventoryItemId);
+            if (item) {
+                topSellingChartLabels.push(item.name);
+                topSellingChartData.push(ranked._sum.quantity);
+            }
+        }
+
+        // 5. Chart Data: Revenue Distribution by Category
+        // We iterate all items to group value or fetch sales. 
+        // Let's do "Current Inventory Value by Category" or "Sales by Category"?
+        // Requirement says "Revenue Distribution".
+        // Let's fetch all sold parts this month and group by category.
+
+        const soldPartsThisMonth = await prisma.serviceOrderItem.findMany({
+            where: {
+                type: 'PART',
+                order: {
+                    createdAt: { gte: firstDayOfMonth }
+                },
+                inventoryItemId: { not: null }
+            },
+            include: {
+                inventoryItem: {
+                    select: { category: true }
+                }
+            }
+        });
+
+        const revenueByCategory = {};
+        soldPartsThisMonth.forEach(lineItem => {
+            const cat = lineItem.inventoryItem?.category || 'Uncategorized';
+            revenueByCategory[cat] = (revenueByCategory[cat] || 0) + Number(lineItem.total);
+        });
+
+        const revenueChartLabels = Object.keys(revenueByCategory);
+        const revenueChartValues = Object.values(revenueByCategory);
+
+        // 6. Chart Data: Monthly Sales Trend (Last 6 Months)
+        // We rely on ServiceOrder completion/creation dates
+        const monthlySales = await prisma.serviceOrder.groupBy({
+            by: ['createdAt'], // Grouping by exact date is hard in Prisma without raw query
+            // Alternative: Fetch all orders in last 6 months and process in JS
+            where: {
+                createdAt: { gte: sixMonthsAgo },
+                status: { not: 'CANCELLED' } // Include pending/completed
+            },
+            _sum: {
+                partsTotal: true // Only parts revenue for inventory report? Or total? "Total Sales" usually implies everything.
+                // But this is INVENTORY report. Let's show Parts Sales.
+            }
+        });
+
+        // Process monthly sales in JS
+        // Map: "Jan", "Feb" -> Total
+        const trendMap = {};
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+        // Initialize last 6 months 0
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date();
+            d.setMonth(d.getMonth() - i);
+            const key = monthNames[d.getMonth()];
+            trendMap[key] = 0;
+        }
+
+        // Simple fetch of all orders to aggregate manually (since groupBy createdAt is too granular)
+        const recentOrders = await prisma.serviceOrder.findMany({
+            where: {
+                createdAt: { gte: sixMonthsAgo },
+                status: { not: 'CANCELLED' }
+            },
+            select: {
+                createdAt: true,
+                partsTotal: true
+            }
+        });
+
+        recentOrders.forEach(order => {
+            const m = monthNames[new Date(order.createdAt).getMonth()];
+            if (trendMap[m] !== undefined) {
+                trendMap[m] += Number(order.partsTotal);
+            }
+        });
+
+        const trendLabels = Object.keys(trendMap);
+        const trendData = Object.values(trendMap);
+
+
+        // 7. Dead Stock 
+        // Items with stock > 0 but NOT sold in last 180 days (6 months)
+        // Find items where id is NOT in the set of sold items from last 6 months
+        const soldItemIdsLast6Months = await prisma.serviceOrderItem.findMany({
+            where: {
+                type: 'PART',
+                inventoryItemId: { not: null },
+                order: {
+                    createdAt: { gte: sixMonthsAgo }
+                }
+            },
+            distinct: ['inventoryItemId'],
+            select: { inventoryItemId: true }
+        });
+
+        const activeItemIds = new Set(soldItemIdsLast6Months.map(i => i.inventoryItemId));
+
+        const deadStockList = allItems
+            .filter(item => item.quantity > 0 && !activeItemIds.has(item.id))
+            .map(item => ({
+                id: item.id,
+                name: item.name,
+                lastSold: item.updatedAt.toISOString().split('T')[0], // Approximation using updatedAt if no sales record
+                daysSinceSold: Math.floor((new Date() - new Date(item.updatedAt)) / (1000 * 60 * 60 * 24)),
+                stock: item.quantity
+            }))
+            .filter(item => item.daysSinceSold > 30) // Only show if stagnant for > 30 days to reduce noise
+            .slice(0, 50); // Limit result
+
+
+        res.json({
+            kpi: {
+                inventoryValue,
+                lowStockCount,
+                fastestMover
+            },
+            restockList,
+            deadStockList,
+            charts: {
+                topSelling: {
+                    labels: topSellingChartLabels,
+                    data: topSellingChartData
+                },
+                revenueDistribution: {
+                    labels: revenueChartLabels,
+                    data: revenueChartValues
+                },
+                salesTrend: {
+                    labels: trendLabels,
+                    data: trendData
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Inventory Report Error:', error);
+        res.status(500).json({ message: 'Failed to generate inventory reports' });
+    }
+});
+
+/**
+     * @route GET /api/inventory/:id
+     * @desc Get a single inventory item by ID
+     * @access Staff, Admin
+     */
 router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.params;
@@ -253,6 +493,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
+                targetStock: req.body.targetStock ? parseInt(req.body.targetStock) : null,
                 imageUrl,
                 imageFileId,
                 description,
@@ -304,6 +545,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
+                targetStock: req.body.targetStock ? parseInt(req.body.targetStock) : null,
                 imageUrl,
                 imageFileId,
                 description,
@@ -348,6 +590,34 @@ router.patch('/:id/restock', authenticateToken, authorizeRoles(['staff', 'admin'
     } catch (error) {
         console.error('Restock Error:', error);
         res.status(500).json({ message: 'Failed to restock item' });
+    }
+});
+
+/**
+ * @route PATCH /api/inventory/:id/target-stock
+ * @desc Update target stock level
+ * @access Staff, Admin
+ */
+router.patch('/:id/target-stock', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { targetStock } = req.body;
+
+        if (targetStock === undefined || isNaN(targetStock) || targetStock < 0) {
+            return res.status(400).json({ message: 'Invalid target stock value' });
+        }
+
+        const updatedItem = await prisma.inventoryItem.update({
+            where: { id: parseInt(id) },
+            data: {
+                targetStock: parseInt(targetStock)
+            }
+        });
+
+        res.json(updatedItem);
+    } catch (error) {
+        console.error('Update Target Stock Error:', error);
+        res.status(500).json({ message: 'Failed to update target stock' });
     }
 });
 
@@ -549,5 +819,6 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, 
             }
         });
 });
+
 
 export default router;

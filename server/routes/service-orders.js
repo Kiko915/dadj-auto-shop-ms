@@ -4,6 +4,7 @@ import prisma from '../db.js';
 import imagekit from '../config/imagekit.js';
 import multer from 'multer';
 import fs from 'fs';
+import { generateReceiptHtml } from '../utils/receiptGenerator.js';
 
 const upload = multer({
     dest: 'uploads/',
@@ -178,6 +179,49 @@ router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
     } catch (error) {
         console.error('Get Service Order Error:', error);
         res.status(500).json({ message: 'Failed to fetch service order' });
+    }
+});
+
+/**
+ * @route GET /api/service-orders/:id/receipt
+ * @desc Get receipt for a service order (latest payment)
+ * @access Staff, Admin
+ */
+router.get('/:id/receipt', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const order = await prisma.serviceOrder.findUnique({
+            where: { id },
+            include: {
+                customer: true,
+                vehicle: true,
+                items: true,
+                payments: {
+                    orderBy: { date: 'desc' },
+                    take: 1
+                }
+            }
+        });
+
+        if (!order) {
+            return res.status(404).send('Service order not found');
+        }
+
+        // Use latest payment or create a dummy one for unpaid/invoice view
+        const latestPayment = order.payments[0] || {
+            date: new Date(),
+            amount: 0,
+            method: 'UNPAID',
+            referenceNo: null
+        };
+
+        const html = generateReceiptHtml(order, latestPayment);
+        res.send(html);
+
+    } catch (error) {
+        console.error('Error generating service order receipt:', error);
+        res.status(500).send('Failed to generate receipt');
     }
 });
 

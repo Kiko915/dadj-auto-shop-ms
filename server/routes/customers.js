@@ -184,8 +184,21 @@ router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             });
         }
 
+        // Calculate aggregates for service stats
+        const stats = await prisma.serviceOrder.aggregate({
+            where: {
+                customerId: id,
+                status: 'COMPLETED'
+            },
+            _count: { id: true },
+            _sum: { totalAmount: true }
+        });
+
         // Map the dynamic count to totalVehicles to ensure accuracy
         customer.totalVehicles = customer._count.vehicles;
+        customer.serviceCount = stats._count.id;
+        customer.totalSpent = stats._sum.totalAmount || 0;
+
         delete customer._count;
 
         return res.status(200).json({
@@ -325,6 +338,44 @@ router.delete('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), asy
         return res.status(500).json({
             message: 'Failed to delete customer',
             error: 'CUSTOMER_ERROR',
+        });
+    }
+});
+
+/**
+ * @route GET /api/customers/:id/service-orders
+ * @desc Get all service orders for a specific customer
+ * @access Staff, Admin
+ * @returns {200} { message: string, serviceOrders: Array }
+ */
+router.get('/:id/service-orders', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const serviceOrders = await prisma.serviceOrder.findMany({
+            where: { customerId: id },
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                vehicle: {
+                    select: {
+                        id: true,
+                        make: true,
+                        model: true,
+                        licensePlate: true
+                    }
+                }
+            }
+        });
+
+        return res.status(200).json({
+            message: 'Service orders retrieved successfully',
+            serviceOrders
+        });
+    } catch (error) {
+        console.error('Get Customer Service Orders Error:', error);
+        return res.status(500).json({
+            message: 'Failed to retrieve service orders',
+            error: 'SERVER_ERROR'
         });
     }
 });

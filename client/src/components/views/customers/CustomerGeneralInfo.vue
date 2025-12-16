@@ -12,6 +12,8 @@ const props = defineProps({
   }
 })
 
+defineEmits(['view-history'])
+
 const formattedTotalSpent = computed(() => {
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -47,7 +49,10 @@ const formattedBirthday = computed(() => {
         </CardContent>
       </Card>
 
-      <Card class="bg-green-50/50 border-green-200">
+      <Card 
+        class="bg-green-50/50 border-green-200 cursor-pointer hover:bg-green-100/50 transition-colors"
+        @click="$emit('view-history')"
+      >
         <CardContent class="p-6">
           <div class="flex items-center gap-4">
             <div class="p-3 bg-green-100 rounded-full">
@@ -61,7 +66,10 @@ const formattedBirthday = computed(() => {
         </CardContent>
       </Card>
 
-      <Card class="bg-amber-50/50 border-amber-200">
+      <Card 
+        class="bg-amber-50/50 border-amber-200 cursor-pointer hover:bg-amber-100/50 transition-colors"
+        @click="$emit('view-history')"
+      >
         <CardContent class="p-6">
           <div class="flex items-center gap-4">
             <div class="p-3 bg-amber-100 rounded-full">
