@@ -224,14 +224,14 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <!-- Discount Info (if any) -->
-        <div v-if="estimate.discount > 0" class="flex items-start gap-4 p-3 bg-red-50/50 rounded-lg border border-red-100">
+        <div v-if="estimate?.discount != null && estimate.discount > 0" class="flex items-start gap-4 p-3 bg-red-50/50 rounded-lg border border-red-100">
             <div class="p-2 bg-white rounded-md border border-red-100 shadow-sm text-red-600">
                  <BadgePercent class="h-5 w-5" />
             </div>
             <div class="flex-1 space-y-1">
                 <Label class="text-sm font-medium text-red-900">Discount Applied</Label>
                 <div class="flex items-center gap-2 text-sm text-red-700">
-                    <span class="font-bold">- ₱{{ estimate.discount }}</span>
+                    <span class="font-bold">- ₱{{ Number(estimate.discount).toFixed(2) }}</span>
                     <span v-if="estimate.discountReason" class="text-red-600/80">({{ estimate.discountReason }})</span>
                 </div>
             </div>
