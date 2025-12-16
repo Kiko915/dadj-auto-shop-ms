@@ -209,6 +209,18 @@ router.get('/brands', authenticateToken, authorizeRoles(['staff', 'admin']), asy
 const RESTOCK_THRESHOLD_MULTIPLIER = 3;
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Helper: Validate Target Stock
+function validateTargetStock(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new Error('Target Stock must be a non-negative integer');
+    }
+    return parsed;
+}
+
 router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const now = new Date();
@@ -480,11 +492,19 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             imageUrl,
             imageFileId,
             description,
-            sku
+            sku,
+            targetStock
         } = req.body;
 
         if (!name || !brand || !buyingPrice || !sellingPrice) {
             return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(targetStock);
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
         }
 
         const newItem = await prisma.inventoryItem.create({
@@ -496,7 +516,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
-                targetStock: req.body.targetStock ? parseInt(req.body.targetStock) : null,
+                targetStock: validTargetStock,
                 imageUrl,
                 imageFileId,
                 description,
@@ -538,6 +558,13 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(req.body.targetStock);
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
+        }
+
         const updatedItem = await prisma.inventoryItem.update({
             where: { id: parseInt(id) },
             data: {
@@ -548,7 +575,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
-                targetStock: req.body.targetStock ? parseInt(req.body.targetStock) : null,
+                targetStock: validTargetStock,
                 imageUrl,
                 imageFileId,
                 description,
@@ -606,14 +633,24 @@ router.patch('/:id/target-stock', authenticateToken, authorizeRoles(['staff', 'a
         const { id } = req.params;
         const { targetStock } = req.body;
 
-        if (targetStock === undefined || isNaN(targetStock) || targetStock < 0) {
-            return res.status(400).json({ message: 'Invalid target stock value' });
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(targetStock);
+            // For this endpoint specifically, null/undefined might mean "clear it" or "invalid request" depending on intent.
+            // But existing logic seemed to require a value. 
+            // Previous check: if (targetStock === undefined || isNaN(targetStock) || targetStock < 0) -> 400
+            // So it essentially required a valid number.
+            if (validTargetStock === null) {
+                return res.status(400).json({ message: 'Invalid target stock value' });
+            }
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
         }
 
         const updatedItem = await prisma.inventoryItem.update({
             where: { id: parseInt(id) },
             data: {
-                targetStock: parseInt(targetStock)
+                targetStock: validTargetStock
             }
         });
 
