@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Eye } from 'lucide-vue-next'
+import { Eye, Gift } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ interface Customer {
   lastName: string
   suffix?: string | null
   email: string
+  birthday?: string | null
   phoneNumber: string
   loyaltyStatus: 'Loyal' | 'Regular' | 'VIP'
   totalVehicles?: number
@@ -42,6 +43,13 @@ const getFullName = (customer: Customer) => {
   return parts.join(' ')
 }
 
+const isBirthdayToday = (dateString?: string | null) => {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  const today = new Date()
+  return date.getDate() === today.getDate() && date.getMonth() === today.getMonth()
+}
+
 const handleCheckboxChange = () => {
   emit('toggle-selection', props.customer.id)
 }
@@ -59,6 +67,9 @@ const handleCheckboxChange = () => {
     <!-- Name -->
     <div class="flex items-center gap-2">
       <span>{{ getFullName(customer) }}</span>
+      <div v-if="isBirthdayToday(customer.birthday)" title="It's their birthday today!" class="flex items-center justify-center h-6 w-6 rounded-full bg-pink-100 text-pink-500 ring-2 ring-white">
+        <Gift class="h-3.5 w-3.5" />
+      </div>
     </div>
     
     <!-- Phone -->

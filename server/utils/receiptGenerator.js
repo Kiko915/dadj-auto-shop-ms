@@ -148,6 +148,12 @@ export function generateReceiptHtml(initialOrder, initialPayment) {
                             <td style="padding: 4px 0; color: #64748b; font-size: 14px;">Parts & Materials</td>
                             <td style="padding: 4px 0; text-align: right; font-family: monospace; color: #334155;">${formatCurrency(order.partsTotal)}</td>
                         </tr>
+                        ${order.discount > 0 ? `
+                        <tr>
+                            <td style="padding: 4px 0; color: #ef4444; font-size: 14px;">Discount ${order.discountReason ? `(${order.discountReason})` : ''}</td>
+                            <td style="padding: 4px 0; text-align: right; font-family: monospace; color: #ef4444;">- ${formatCurrency(order.discount)}</td>
+                        </tr>
+                        ` : ''}
                     </table>
 
                     <div style="height: 1px; width: 100%; background-color: #e2e8f0; margin: 10px 0;"></div>
