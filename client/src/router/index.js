@@ -76,6 +76,11 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/inventory/Inventory.vue'),
         },
         {
+          path: 'inventory/reports',
+          name: 'inventory-reports',
+          component: () => import('@/pages/dashboard/inventory/reports/index.vue'),
+        },
+        {
           path: 'estimates',
           name: 'estimates',
           component: () => import('@/pages/dashboard/estimates/index.vue'),

@@ -119,7 +119,6 @@ const navigationItems = [
         icon: TrendingUp,
         url: '/dashboard/inventory/reports',
         description: 'Critical reports for preventing overstocking',
-        comingSoon: true
       },
     ],
   },

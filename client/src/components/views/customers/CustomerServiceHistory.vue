@@ -2,6 +2,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table'
 import { History, Plus, Receipt } from 'lucide-vue-next'
 import formatDate from '@/utils/formatDate'
 
@@ -19,6 +27,28 @@ const formatCurrency = (amount) => {
     style: 'currency',
     currency: 'PHP',
   }).format(amount)
+}
+
+const getPaymentStatusVariant = (status) => {
+  const s = status?.toUpperCase()
+  switch (s) {
+    case 'PAID': return 'default'
+    case 'UNPAID': 
+    case 'OUTSTANDING': return 'destructive'
+    case 'PARTIAL': return 'secondary'
+    default: return 'secondary'
+  }
+}
+
+const getPaymentStatusClass = (status) => {
+  const s = status?.toUpperCase()
+  switch (s) {
+    case 'PAID': return 'bg-green-500 hover:bg-green-600 text-white border-transparent'
+    case 'PARTIAL': return 'bg-yellow-500 hover:bg-yellow-600 text-white border-transparent'
+    case 'UNPAID':
+    case 'OUTSTANDING': return 'bg-red-500 hover:bg-red-600 text-white border-transparent'
+    default: return ''
+  }
 }
 </script>
 
@@ -44,35 +74,38 @@ const formatCurrency = (amount) => {
 
       <!-- Service History Table -->
       <div v-else class="rounded-md border">
-        <table class="w-full">
-          <thead class="bg-muted/50">
-            <tr class="border-b">
-              <th class="px-4 py-3 text-left text-sm font-medium">Date</th>
-              <th class="px-4 py-3 text-left text-sm font-medium">Vehicle</th>
-              <th class="px-4 py-3 text-left text-sm font-medium">Total Amount</th>
-              <th class="px-4 py-3 text-left text-sm font-medium">Payment Status</th>
-              <th class="px-4 py-3 text-right text-sm font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="service in serviceHistory" :key="service.id" class="border-b hover:bg-muted/50">
-              <td class="px-4 py-3">{{ formatDate(service.date) }}</td>
-              <td class="px-4 py-3">{{ service.vehicleName }}</td>
-              <td class="px-4 py-3 font-medium">{{ formatCurrency(service.totalAmount) }}</td>
-              <td class="px-4 py-3">
-                <Badge :variant="service.paymentStatus === 'Paid' ? 'default' : service.paymentStatus === 'Outstanding' ? 'destructive' : 'secondary'">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Vehicle</TableHead>
+              <TableHead>Total Amount</TableHead>
+              <TableHead>Payment Status</TableHead>
+              <TableHead class="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="service in serviceHistory" :key="service.id">
+              <TableCell>{{ formatDate(service.date) }}</TableCell>
+              <TableCell>{{ service.vehicleName }}</TableCell>
+              <TableCell class="font-medium">{{ formatCurrency(service.totalAmount) }}</TableCell>
+              <TableCell>
+                <Badge 
+                  :variant="getPaymentStatusVariant(service.paymentStatus)"
+                  :class="getPaymentStatusClass(service.paymentStatus)"
+                >
                   {{ service.paymentStatus }}
                 </Badge>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <Button variant="outline" size="sm" @click="emit('viewReceipt', service.id)">
+              </TableCell>
+              <TableCell class="text-right">
+                <Button variant="ghost" size="sm" @click="emit('viewReceipt', service.id)">
                   <Receipt class="h-4 w-4 mr-2" />
                   View Receipt
                 </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
     </CardContent>
   </Card>

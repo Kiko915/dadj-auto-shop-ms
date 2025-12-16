@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import api from '@/api'
 import { getCustomer } from '@/api/customers'
 import { getCustomerVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/api/vehicles'
 import { getCustomerServiceOrders } from '@/api/serviceOrders'
@@ -135,7 +136,16 @@ const fetchCustomerData = async () => {
     // Fetch service history
     try {
       const serviceResponse = await getCustomerServiceOrders(customerId.value)
-      serviceHistory.value = serviceResponse.serviceOrders || []
+      const orders = serviceResponse.serviceOrders || []
+      
+      serviceHistory.value = orders.map((order: any) => ({
+        id: order.id,
+        date: order.updatedAt,
+        vehicleId: order.vehicleId,
+        vehicleName: order.vehicle ? `${order.vehicle.make} ${order.vehicle.model}` : 'Unknown Vehicle',
+        totalAmount: order.totalAmount,
+        paymentStatus: order.paymentStatus || 'Outstanding' // Defaulting if missing
+      }))
     } catch (error) {
       console.warn('Failed to fetch service history:', error)
       serviceHistory.value = []
@@ -312,8 +322,20 @@ const handleVehicleSaved = async (vehicleData: any) => {
   }
 }
 
-const handleViewReceipt = (serviceId: string) => {
-  router.push(`/dashboard/service-orders/${serviceId}`)
+const handleViewReceipt = async (serviceId: string) => {
+  try {
+      const response = await api.get(`/service-orders/${serviceId}/receipt`)
+      const receiptWindow = window.open('', '_blank')
+      if (!receiptWindow) {
+          toast.error('Error', { description: 'Popup blocked. Please allow popups for this site.' })
+          return
+      }
+      receiptWindow.document.write(response.data)
+      receiptWindow.document.close()
+  } catch (error) {
+       console.error('Failed to generate receipt', error)
+       toast.error('Failed to generate receipt')
+  }
 }
 
 const goBack = () => {
@@ -389,7 +411,10 @@ onBeforeUnmount(() => {
 
         <!-- General Info Tab -->
         <TabsContent value="general">
-          <CustomerGeneralInfo :customer="customer" />
+          <CustomerGeneralInfo 
+            :customer="customer" 
+            @view-history="activeTab = 'history'"
+          />
         </TabsContent>
 
         <!-- Vehicles Tab -->
@@ -488,5 +513,7 @@ onBeforeUnmount(() => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+
   </div>
 </template>

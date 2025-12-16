@@ -201,6 +201,261 @@ router.get('/brands', authenticateToken, authorizeRoles(['staff', 'admin']), asy
      * @desc Get a single inventory item by ID
      * @access Staff, Admin
      */
+/**
+ * @route GET /api/inventory/reports
+ * @desc Get detailed inventory reports and analytics
+ * @access Staff, Admin
+ */
+const RESTOCK_THRESHOLD_MULTIPLIER = 3;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Helper: Validate Target Stock
+function validateTargetStock(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new Error('Target Stock must be a non-negative integer');
+    }
+    return parsed;
+}
+
+router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        // 1. Fetch Core Data
+        const allItems = await fetchAllInventoryItems();
+
+        // 2. Compute/Fetch Specifics
+        const fastestMover = await findFastestMover(allItems, firstDayOfMonth);
+        const kpi = calculateInventoryKPIs(allItems, fastestMover);
+        const restockList = generateRestockList(allItems);
+        const charts = await calculateChartData(allItems, firstDayOfMonth, sixMonthsAgo);
+        const deadStockList = await findDeadStock(allItems, sixMonthsAgo);
+
+        // 3. Response
+        res.json({
+            kpi,
+            restockList,
+            deadStockList,
+            charts
+        });
+
+    } catch (error) {
+        console.error('Inventory Report Error:', error);
+        res.status(500).json({ message: 'Failed to generate inventory reports' });
+    }
+});
+
+// --- Helper Functions ---
+
+async function fetchAllInventoryItems() {
+    return prisma.inventoryItem.findMany({
+        select: {
+            id: true,
+            name: true,
+            quantity: true,
+            buyingPrice: true,
+            sellingPrice: true,
+            lowStockThreshold: true,
+            targetStock: true,
+            category: true,
+            updatedAt: true,
+            createdAt: true,
+            brand: true
+        }
+    });
+}
+
+function calculateInventoryKPIs(allItems, fastestMover) {
+    const inventoryValue = allItems.reduce((sum, item) => sum + (Number(item.buyingPrice) * item.quantity), 0);
+    const lowStockCount = allItems.filter(item => item.quantity <= item.lowStockThreshold).length;
+
+    return {
+        inventoryValue,
+        lowStockCount,
+        fastestMover
+    };
+}
+
+function generateRestockList(allItems) {
+    const lowStockItems = allItems.filter(item => item.quantity <= item.lowStockThreshold);
+    return lowStockItems.map(item => {
+        const maxStock = item.targetStock || (item.lowStockThreshold * RESTOCK_THRESHOLD_MULTIPLIER);
+        return {
+            id: item.id,
+            name: item.name,
+            stock: item.quantity,
+            maxStock: maxStock,
+            costPerUnit: Number(item.buyingPrice),
+            selected: false
+        };
+    });
+}
+
+async function findFastestMover(allItems, firstDayOfMonth) {
+    const topSellingItems = await prisma.serviceOrderItem.groupBy({
+        by: ['inventoryItemId'],
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 1
+    });
+
+    if (topSellingItems.length > 0 && topSellingItems[0].inventoryItemId) {
+        const bestItem = allItems.find(i => i.id === topSellingItems[0].inventoryItemId);
+        if (bestItem) {
+            return {
+                name: bestItem.name,
+                count: topSellingItems[0]._sum.quantity
+            };
+        }
+    }
+    return { name: "N/A", count: 0 };
+}
+
+async function calculateChartData(allItems, firstDayOfMonth, sixMonthsAgo) {
+    // A. Top Selling Parts (This Month)
+    const topSellingItems = await prisma.serviceOrderItem.groupBy({
+        by: ['inventoryItemId'],
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 5
+    });
+
+    const topSellingChartLabels = [];
+    const topSellingChartData = [];
+    for (const ranked of topSellingItems) {
+        const item = allItems.find(i => i.id === ranked.inventoryItemId);
+        if (item) {
+            topSellingChartLabels.push(item.name);
+            topSellingChartData.push(ranked._sum.quantity);
+        }
+    }
+
+    // B. Revenue Distribution (This Month)
+    const soldPartsThisMonth = await prisma.serviceOrderItem.findMany({
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        include: { inventoryItem: { select: { category: true } } }
+    });
+
+    const revenueByCategory = {};
+    soldPartsThisMonth.forEach(lineItem => {
+        const cat = lineItem.inventoryItem?.category || 'Uncategorized';
+        revenueByCategory[cat] = (revenueByCategory[cat] || 0) + Number(lineItem.total);
+    });
+
+    // C. Sales Trend (Last 6 Months)
+    const recentOrders = await prisma.serviceOrder.findMany({
+        where: {
+            createdAt: { gte: sixMonthsAgo },
+            status: { not: 'CANCELLED' }
+        },
+        select: { createdAt: true, partsTotal: true }
+    });
+
+    const trendMap = {};
+    // Initialize
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = MONTH_NAMES[d.getMonth()];
+        trendMap[key] = 0;
+    }
+    // Populate
+    recentOrders.forEach(order => {
+        const m = MONTH_NAMES[new Date(order.createdAt).getMonth()];
+        if (trendMap[m] !== undefined) {
+            trendMap[m] += Number(order.partsTotal);
+        }
+    });
+
+    return {
+        topSelling: { labels: topSellingChartLabels, data: topSellingChartData },
+        revenueDistribution: { labels: Object.keys(revenueByCategory), data: Object.values(revenueByCategory) },
+        salesTrend: { labels: Object.keys(trendMap), data: Object.values(trendMap) }
+    };
+}
+
+// ... (rest of the file content)
+
+async function findDeadStock(allItems, sixMonthsAgo) {
+    const soldItemIdsLast6Months = await prisma.serviceOrderItem.findMany({
+        where: {
+            type: 'PART',
+            inventoryItemId: { not: null },
+            order: { createdAt: { gte: sixMonthsAgo } }
+        },
+        distinct: ['inventoryItemId'],
+        select: { inventoryItemId: true }
+    });
+
+    const activeItemIds = new Set(soldItemIdsLast6Months.map(i => i.inventoryItemId));
+    const now = new Date();
+
+    const preliminaryDeadStock = allItems.filter(item => item.quantity > 0 && !activeItemIds.has(item.id));
+
+    const deadStockWithSales = await Promise.all(
+        preliminaryDeadStock.map(async (item) => {
+            const lastSale = await prisma.serviceOrderItem.findFirst({
+                where: {
+                    inventoryItemId: item.id,
+                    type: 'PART'
+                },
+                orderBy: {
+                    order: { createdAt: 'desc' }
+                },
+                include: {
+                    order: { select: { createdAt: true } }
+                }
+            });
+
+            const lastSoldDate = lastSale?.order?.createdAt || null;
+            // If never sold, calculate age from creation time (so fresh items don't appear as dead stock)
+            // If creation time is missing (legacy), fallback to current date (so they appear as 0 days old and are excluded)
+            const effectiveLastDate = lastSoldDate || item.createdAt || now;
+
+            const daysSinceSold = Math.floor((now - new Date(effectiveLastDate)) / (1000 * 60 * 60 * 24));
+
+            return {
+                id: item.id,
+                name: item.name,
+                lastSold: lastSoldDate ? lastSoldDate.toISOString().split('T')[0] : 'Never',
+                daysSinceSold: daysSinceSold,
+                stock: item.quantity
+            };
+        })
+    );
+
+    return deadStockWithSales
+        .filter(item => item.daysSinceSold > 180)
+        .sort((a, b) => b.daysSinceSold - a.daysSinceSold) // Sort by most stagnant
+        .slice(0, 50);
+}
+
+/**
+     * @route GET /api/inventory/:id
+     * @desc Get a single inventory item by ID
+     * @access Staff, Admin
+     */
 router.get('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const { id } = req.params;
@@ -237,11 +492,19 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             imageUrl,
             imageFileId,
             description,
-            sku
+            sku,
+            targetStock
         } = req.body;
 
         if (!name || !brand || !buyingPrice || !sellingPrice) {
             return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(targetStock);
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
         }
 
         const newItem = await prisma.inventoryItem.create({
@@ -253,6 +516,7 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
+                targetStock: validTargetStock,
                 imageUrl,
                 imageFileId,
                 description,
@@ -294,6 +558,13 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(req.body.targetStock);
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
+        }
+
         const updatedItem = await prisma.inventoryItem.update({
             where: { id: parseInt(id) },
             data: {
@@ -304,6 +575,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                 buyingPrice: parseFloat(buyingPrice),
                 sellingPrice: parseFloat(sellingPrice),
                 lowStockThreshold: parseInt(lowStockThreshold) || 5,
+                targetStock: validTargetStock,
                 imageUrl,
                 imageFileId,
                 description,
@@ -348,6 +620,44 @@ router.patch('/:id/restock', authenticateToken, authorizeRoles(['staff', 'admin'
     } catch (error) {
         console.error('Restock Error:', error);
         res.status(500).json({ message: 'Failed to restock item' });
+    }
+});
+
+/**
+ * @route PATCH /api/inventory/:id/target-stock
+ * @desc Update target stock level
+ * @access Staff, Admin
+ */
+router.patch('/:id/target-stock', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { targetStock } = req.body;
+
+        let validTargetStock = null;
+        try {
+            validTargetStock = validateTargetStock(targetStock);
+            // For this endpoint specifically, null/undefined might mean "clear it" or "invalid request" depending on intent.
+            // But existing logic seemed to require a value. 
+            // Previous check: if (targetStock === undefined || isNaN(targetStock) || targetStock < 0) -> 400
+            // So it essentially required a valid number.
+            if (validTargetStock === null) {
+                return res.status(400).json({ message: 'Invalid target stock value' });
+            }
+        } catch (e) {
+            return res.status(400).json({ message: e.message });
+        }
+
+        const updatedItem = await prisma.inventoryItem.update({
+            where: { id: parseInt(id) },
+            data: {
+                targetStock: validTargetStock
+            }
+        });
+
+        res.json(updatedItem);
+    } catch (error) {
+        console.error('Update Target Stock Error:', error);
+        res.status(500).json({ message: 'Failed to update target stock' });
     }
 });
 
@@ -549,5 +859,6 @@ router.post('/bulk-upload', authenticateToken, authorizeRoles(['admin']), (req, 
             }
         });
 });
+
 
 export default router;
