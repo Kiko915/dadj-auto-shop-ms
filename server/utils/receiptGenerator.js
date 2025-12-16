@@ -1,3 +1,27 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Fallback logo (Simple SVG DADJ text) if file reading fails
+const PRIMARY_LOGO_URL = 'https://i.ibb.co/W4F60Gf0/symbol-w-wordmark-primary.png';
+const FALLBACK_LOGO = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAxMjAgNDAiPjx0ZXh0IHg9IjEwIiB5PSIzMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzMCIgZmlsbD0iIzBmMTcyYSI+REFESjwvdGV4dD48L3N2Zz4=";
+
+let logoSrc = FALLBACK_LOGO;
+
+try {
+    const logoPath = path.join(__dirname, '../../client/public/logo/symbol_w_wordmark_primary.png');
+    if (fs.existsSync(logoPath)) {
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoSrc = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+    } else {
+        console.warn('Receipt Logo not found at:', logoPath);
+    }
+} catch (error) {
+    console.error('Failed to load receipt logo:', error);
+}
 
 const escapeHtml = (unsafe) => {
     if (unsafe === null || unsafe === undefined) return '';
@@ -33,7 +57,7 @@ export function generateReceiptHtml(order, payment) {
                 <div style="padding: 30px; border-bottom: 1px solid #f1f5f9;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="display: flex; align-items: center; gap: 15px;">
-                                <img src="https://i.ibb.co/W4F60Gf0/symbol-w-wordmark-primary.png" alt="DADJ Logo" style="height: 48px; width: auto; object-fit: contain;" />
+                                <img src="${PRIMARY_LOGO_URL}" onerror="this.onerror=null; this.src='${logoSrc}'" alt="DADJ Auto Shop" style="height: 48px; width: auto; object-fit: contain;" />
                                 <div style="height: 30px; width: 1px; background-color: #e2e8f0; margin: 0 15px;"></div>
                                 <div>
                                 <h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: -0.5px;">INVOICE</h1>
@@ -126,14 +150,18 @@ export function generateReceiptHtml(order, payment) {
                         </table>
                     </div>
 
+
                     <!-- Payment Info Box -->
+                    ${(payment.method !== 'UNPAID' && payment.amount > 0) ? `
                     <div style="margin-top: 20px; background-color: #e2e8f0; border-radius: 6px; padding: 15px;">
-                        <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Payment Received</p>
+                        <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Payment Received (This Transaction)</p>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 14px; font-weight: 700; color: #0f172a;">${formatCurrency(payment.amount)}</span>
                             <span style="font-size: 12px; font-weight: 600; color: #475569; background-color: white; padding: 2px 8px; border-radius: 4px; margin-left: 30px;">${escapeHtml(payment.method)} ${payment.referenceNo ? `(#${escapeHtml(payment.referenceNo)})` : ''}</span>
                         </div>
                     </div>
+                    ` : ''}
+
 
                 </div>
 

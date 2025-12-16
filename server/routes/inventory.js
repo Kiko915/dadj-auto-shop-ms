@@ -206,6 +206,9 @@ router.get('/brands', authenticateToken, authorizeRoles(['staff', 'admin']), asy
  * @desc Get detailed inventory reports and analytics
  * @access Staff, Admin
  */
+const RESTOCK_THRESHOLD_MULTIPLIER = 3;
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), async (req, res) => {
     try {
         const now = new Date();
@@ -213,221 +216,22 @@ router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), as
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        // 1. Inventory Value & Low Stock KPI
-        const allItems = await prisma.inventoryItem.findMany({
-            select: {
-                id: true,
-                name: true,
-                quantity: true,
-                buyingPrice: true,
-                sellingPrice: true,
-                lowStockThreshold: true,
-                targetStock: true,
-                category: true,
-                updatedAt: true,
-                brand: true
-            }
-        });
+        // 1. Fetch Core Data
+        const allItems = await fetchAllInventoryItems();
 
-        const inventoryValue = allItems.reduce((sum, item) => sum + (Number(item.buyingPrice) * item.quantity), 0);
+        // 2. Compute/Fetch Specifics
+        const fastestMover = await findFastestMover(allItems, firstDayOfMonth);
+        const kpi = calculateInventoryKPIs(allItems, fastestMover);
+        const restockList = generateRestockList(allItems);
+        const charts = await calculateChartData(allItems, firstDayOfMonth, sixMonthsAgo);
+        const deadStockList = await findDeadStock(allItems, sixMonthsAgo);
 
-        // Low Stock Count (where quantity <= threshold)
-        const lowStockItems = allItems.filter(item => item.quantity <= item.lowStockThreshold);
-        const lowStockCount = lowStockItems.length;
-
-        // 2. Restock Recommendations
-        // Target Stock = item.targetStock || Threshold * 3 (Rule of thumb)
-        const restockList = lowStockItems.map(item => {
-            const maxStock = item.targetStock || (item.lowStockThreshold * 3);
-            return {
-                id: item.id,
-                name: item.name,
-                stock: item.quantity,
-                maxStock: maxStock,
-                costPerUnit: Number(item.buyingPrice),
-                selected: false // For UI checkbox
-            };
-        });
-
-        // 3. Fastest Mover (Top selling item this month)
-        // We look at ServiceOrderItems of type PART linked to orders created/completed this month
-        const topSellingItems = await prisma.serviceOrderItem.groupBy({
-            by: ['inventoryItemId'],
-            where: {
-                type: 'PART',
-                order: {
-                    createdAt: { gte: firstDayOfMonth }
-                },
-                inventoryItemId: { not: null }
-            },
-            _sum: {
-                quantity: true
-            },
-            orderBy: {
-                _sum: {
-                    quantity: 'desc'
-                }
-            },
-            take: 5
-        });
-
-        let fastestMover = { name: "N/A", count: 0 };
-        if (topSellingItems.length > 0 && topSellingItems[0].inventoryItemId) {
-            const bestItem = allItems.find(i => i.id === topSellingItems[0].inventoryItemId);
-            if (bestItem) {
-                fastestMover = {
-                    name: bestItem.name,
-                    count: topSellingItems[0]._sum.quantity
-                };
-            }
-        }
-
-        // 4. Chart Data: Top Selling Parts (This Month)
-        // Reuse topSellingItems from above
-        const topSellingChartLabels = [];
-        const topSellingChartData = [];
-
-        for (const ranked of topSellingItems) {
-            const item = allItems.find(i => i.id === ranked.inventoryItemId);
-            if (item) {
-                topSellingChartLabels.push(item.name);
-                topSellingChartData.push(ranked._sum.quantity);
-            }
-        }
-
-        // 5. Chart Data: Revenue Distribution by Category
-        // We iterate all items to group value or fetch sales. 
-        // Let's do "Current Inventory Value by Category" or "Sales by Category"?
-        // Requirement says "Revenue Distribution".
-        // Let's fetch all sold parts this month and group by category.
-
-        const soldPartsThisMonth = await prisma.serviceOrderItem.findMany({
-            where: {
-                type: 'PART',
-                order: {
-                    createdAt: { gte: firstDayOfMonth }
-                },
-                inventoryItemId: { not: null }
-            },
-            include: {
-                inventoryItem: {
-                    select: { category: true }
-                }
-            }
-        });
-
-        const revenueByCategory = {};
-        soldPartsThisMonth.forEach(lineItem => {
-            const cat = lineItem.inventoryItem?.category || 'Uncategorized';
-            revenueByCategory[cat] = (revenueByCategory[cat] || 0) + Number(lineItem.total);
-        });
-
-        const revenueChartLabels = Object.keys(revenueByCategory);
-        const revenueChartValues = Object.values(revenueByCategory);
-
-        // 6. Chart Data: Monthly Sales Trend (Last 6 Months)
-        // We rely on ServiceOrder completion/creation dates
-        const monthlySales = await prisma.serviceOrder.groupBy({
-            by: ['createdAt'], // Grouping by exact date is hard in Prisma without raw query
-            // Alternative: Fetch all orders in last 6 months and process in JS
-            where: {
-                createdAt: { gte: sixMonthsAgo },
-                status: { not: 'CANCELLED' } // Include pending/completed
-            },
-            _sum: {
-                partsTotal: true // Only parts revenue for inventory report? Or total? "Total Sales" usually implies everything.
-                // But this is INVENTORY report. Let's show Parts Sales.
-            }
-        });
-
-        // Process monthly sales in JS
-        // Map: "Jan", "Feb" -> Total
-        const trendMap = {};
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-        // Initialize last 6 months 0
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date();
-            d.setMonth(d.getMonth() - i);
-            const key = monthNames[d.getMonth()];
-            trendMap[key] = 0;
-        }
-
-        // Simple fetch of all orders to aggregate manually (since groupBy createdAt is too granular)
-        const recentOrders = await prisma.serviceOrder.findMany({
-            where: {
-                createdAt: { gte: sixMonthsAgo },
-                status: { not: 'CANCELLED' }
-            },
-            select: {
-                createdAt: true,
-                partsTotal: true
-            }
-        });
-
-        recentOrders.forEach(order => {
-            const m = monthNames[new Date(order.createdAt).getMonth()];
-            if (trendMap[m] !== undefined) {
-                trendMap[m] += Number(order.partsTotal);
-            }
-        });
-
-        const trendLabels = Object.keys(trendMap);
-        const trendData = Object.values(trendMap);
-
-
-        // 7. Dead Stock 
-        // Items with stock > 0 but NOT sold in last 180 days (6 months)
-        // Find items where id is NOT in the set of sold items from last 6 months
-        const soldItemIdsLast6Months = await prisma.serviceOrderItem.findMany({
-            where: {
-                type: 'PART',
-                inventoryItemId: { not: null },
-                order: {
-                    createdAt: { gte: sixMonthsAgo }
-                }
-            },
-            distinct: ['inventoryItemId'],
-            select: { inventoryItemId: true }
-        });
-
-        const activeItemIds = new Set(soldItemIdsLast6Months.map(i => i.inventoryItemId));
-
-        const deadStockList = allItems
-            .filter(item => item.quantity > 0 && !activeItemIds.has(item.id))
-            .map(item => ({
-                id: item.id,
-                name: item.name,
-                lastSold: item.updatedAt.toISOString().split('T')[0], // Approximation using updatedAt if no sales record
-                daysSinceSold: Math.floor((new Date() - new Date(item.updatedAt)) / (1000 * 60 * 60 * 24)),
-                stock: item.quantity
-            }))
-            .filter(item => item.daysSinceSold > 30) // Only show if stagnant for > 30 days to reduce noise
-            .slice(0, 50); // Limit result
-
-
+        // 3. Response
         res.json({
-            kpi: {
-                inventoryValue,
-                lowStockCount,
-                fastestMover
-            },
+            kpi,
             restockList,
             deadStockList,
-            charts: {
-                topSelling: {
-                    labels: topSellingChartLabels,
-                    data: topSellingChartData
-                },
-                revenueDistribution: {
-                    labels: revenueChartLabels,
-                    data: revenueChartValues
-                },
-                salesTrend: {
-                    labels: trendLabels,
-                    data: trendData
-                }
-            }
+            charts
         });
 
     } catch (error) {
@@ -435,6 +239,205 @@ router.get('/reports', authenticateToken, authorizeRoles(['staff', 'admin']), as
         res.status(500).json({ message: 'Failed to generate inventory reports' });
     }
 });
+
+// --- Helper Functions ---
+
+async function fetchAllInventoryItems() {
+    return prisma.inventoryItem.findMany({
+        select: {
+            id: true,
+            name: true,
+            quantity: true,
+            buyingPrice: true,
+            sellingPrice: true,
+            lowStockThreshold: true,
+            targetStock: true,
+            category: true,
+            updatedAt: true,
+            createdAt: true,
+            brand: true
+        }
+    });
+}
+
+function calculateInventoryKPIs(allItems, fastestMover) {
+    const inventoryValue = allItems.reduce((sum, item) => sum + (Number(item.buyingPrice) * item.quantity), 0);
+    const lowStockCount = allItems.filter(item => item.quantity <= item.lowStockThreshold).length;
+
+    return {
+        inventoryValue,
+        lowStockCount,
+        fastestMover
+    };
+}
+
+function generateRestockList(allItems) {
+    const lowStockItems = allItems.filter(item => item.quantity <= item.lowStockThreshold);
+    return lowStockItems.map(item => {
+        const maxStock = item.targetStock || (item.lowStockThreshold * RESTOCK_THRESHOLD_MULTIPLIER);
+        return {
+            id: item.id,
+            name: item.name,
+            stock: item.quantity,
+            maxStock: maxStock,
+            costPerUnit: Number(item.buyingPrice),
+            selected: false
+        };
+    });
+}
+
+async function findFastestMover(allItems, firstDayOfMonth) {
+    const topSellingItems = await prisma.serviceOrderItem.groupBy({
+        by: ['inventoryItemId'],
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 1
+    });
+
+    if (topSellingItems.length > 0 && topSellingItems[0].inventoryItemId) {
+        const bestItem = allItems.find(i => i.id === topSellingItems[0].inventoryItemId);
+        if (bestItem) {
+            return {
+                name: bestItem.name,
+                count: topSellingItems[0]._sum.quantity
+            };
+        }
+    }
+    return { name: "N/A", count: 0 };
+}
+
+async function calculateChartData(allItems, firstDayOfMonth, sixMonthsAgo) {
+    // A. Top Selling Parts (This Month)
+    const topSellingItems = await prisma.serviceOrderItem.groupBy({
+        by: ['inventoryItemId'],
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 5
+    });
+
+    const topSellingChartLabels = [];
+    const topSellingChartData = [];
+    for (const ranked of topSellingItems) {
+        const item = allItems.find(i => i.id === ranked.inventoryItemId);
+        if (item) {
+            topSellingChartLabels.push(item.name);
+            topSellingChartData.push(ranked._sum.quantity);
+        }
+    }
+
+    // B. Revenue Distribution (This Month)
+    const soldPartsThisMonth = await prisma.serviceOrderItem.findMany({
+        where: {
+            type: 'PART',
+            order: { createdAt: { gte: firstDayOfMonth } },
+            inventoryItemId: { not: null }
+        },
+        include: { inventoryItem: { select: { category: true } } }
+    });
+
+    const revenueByCategory = {};
+    soldPartsThisMonth.forEach(lineItem => {
+        const cat = lineItem.inventoryItem?.category || 'Uncategorized';
+        revenueByCategory[cat] = (revenueByCategory[cat] || 0) + Number(lineItem.total);
+    });
+
+    // C. Sales Trend (Last 6 Months)
+    const recentOrders = await prisma.serviceOrder.findMany({
+        where: {
+            createdAt: { gte: sixMonthsAgo },
+            status: { not: 'CANCELLED' }
+        },
+        select: { createdAt: true, partsTotal: true }
+    });
+
+    const trendMap = {};
+    // Initialize
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = MONTH_NAMES[d.getMonth()];
+        trendMap[key] = 0;
+    }
+    // Populate
+    recentOrders.forEach(order => {
+        const m = MONTH_NAMES[new Date(order.createdAt).getMonth()];
+        if (trendMap[m] !== undefined) {
+            trendMap[m] += Number(order.partsTotal);
+        }
+    });
+
+    return {
+        topSelling: { labels: topSellingChartLabels, data: topSellingChartData },
+        revenueDistribution: { labels: Object.keys(revenueByCategory), data: Object.values(revenueByCategory) },
+        salesTrend: { labels: Object.keys(trendMap), data: Object.values(trendMap) }
+    };
+}
+
+// ... (rest of the file content)
+
+async function findDeadStock(allItems, sixMonthsAgo) {
+    const soldItemIdsLast6Months = await prisma.serviceOrderItem.findMany({
+        where: {
+            type: 'PART',
+            inventoryItemId: { not: null },
+            order: { createdAt: { gte: sixMonthsAgo } }
+        },
+        distinct: ['inventoryItemId'],
+        select: { inventoryItemId: true }
+    });
+
+    const activeItemIds = new Set(soldItemIdsLast6Months.map(i => i.inventoryItemId));
+    const now = new Date();
+
+    const preliminaryDeadStock = allItems.filter(item => item.quantity > 0 && !activeItemIds.has(item.id));
+
+    const deadStockWithSales = await Promise.all(
+        preliminaryDeadStock.map(async (item) => {
+            const lastSale = await prisma.serviceOrderItem.findFirst({
+                where: {
+                    inventoryItemId: item.id,
+                    type: 'PART'
+                },
+                orderBy: {
+                    order: { createdAt: 'desc' }
+                },
+                include: {
+                    order: { select: { createdAt: true } }
+                }
+            });
+
+            const lastSoldDate = lastSale?.order?.createdAt || null;
+            // If never sold, calculate age from creation time (so fresh items don't appear as dead stock)
+            // If creation time is missing (legacy), fallback to large number
+            const effectiveLastDate = lastSoldDate || item.createdAt || new Date(0);
+
+            const daysSinceSold = Math.floor((now - new Date(effectiveLastDate)) / (1000 * 60 * 60 * 24));
+
+            return {
+                id: item.id,
+                name: item.name,
+                lastSold: lastSoldDate ? lastSoldDate.toISOString().split('T')[0] : 'Never',
+                daysSinceSold: daysSinceSold,
+                stock: item.quantity
+            };
+        })
+    );
+
+    return deadStockWithSales
+        .filter(item => item.daysSinceSold > 180)
+        .sort((a, b) => b.daysSinceSold - a.daysSinceSold) // Sort by most stagnant
+        .slice(0, 50);
+}
 
 /**
      * @route GET /api/inventory/:id

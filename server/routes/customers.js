@@ -352,24 +352,42 @@ router.get('/:id/service-orders', authenticateToken, authorizeRoles(['staff', 'a
     try {
         const { id } = req.params;
 
-        const serviceOrders = await prisma.serviceOrder.findMany({
-            where: { customerId: id },
-            orderBy: { updatedAt: 'desc' },
-            include: {
-                vehicle: {
-                    select: {
-                        id: true,
-                        make: true,
-                        model: true,
-                        licensePlate: true
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (Math.max(1, page) - 1) * Math.max(1, limit);
+        const take = Math.max(1, limit);
+
+        const [serviceOrders, total] = await Promise.all([
+            prisma.serviceOrder.findMany({
+                where: { customerId: id },
+                skip,
+                take,
+                orderBy: { updatedAt: 'desc' },
+                include: {
+                    vehicle: {
+                        select: {
+                            id: true,
+                            make: true,
+                            model: true,
+                            licensePlate: true
+                        }
                     }
                 }
-            }
-        });
+            }),
+            prisma.serviceOrder.count({
+                where: { customerId: id }
+            })
+        ]);
 
         return res.status(200).json({
             message: 'Service orders retrieved successfully',
-            serviceOrders
+            serviceOrders,
+            pagination: {
+                total,
+                page: Math.max(1, page),
+                limit: take,
+                totalPages: Math.ceil(total / take)
+            }
         });
     } catch (error) {
         console.error('Get Customer Service Orders Error:', error);
