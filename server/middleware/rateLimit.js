@@ -1,4 +1,17 @@
+import crypto from 'crypto';
+
 const rateLimitMap = new Map();
+let cleanupTimer = null;
+
+// Ensure cleanup on shutdown
+const cleanup = () => {
+    if (cleanupTimer) {
+        clearInterval(cleanupTimer);
+        cleanupTimer = null;
+    }
+};
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 /**
  * Basic in-memory rate limiter middleware.
@@ -9,20 +22,36 @@ export const rateLimiter = (options = {}) => {
     const max = options.max || 10; // Default 10 requests
     const message = options.message || 'Too many requests, please try again later.';
 
-    // Clean up expired entries periodically (every 10 mins)
-    setInterval(() => {
-        const now = Date.now();
-        for (const [key, value] of rateLimitMap.entries()) {
-            if (now - value.startTime > windowMs) {
-                rateLimitMap.delete(key);
+    // Initialize cleanup interval once (singleton pattern)
+    if (!cleanupTimer) {
+        cleanupTimer = setInterval(() => {
+            const now = Date.now();
+            for (const [key, value] of rateLimitMap.entries()) {
+                if (now - value.startTime > windowMs) {
+                    rateLimitMap.delete(key);
+                }
             }
-        }
-    }, 10 * 60 * 1000);
+        }, 10 * 60 * 1000);
+        // Unref to not hold process open if needed, but standard interval is fine.
+    }
 
     return (req, res, next) => {
-        // Get IP directly or from headers (if behind proxy)
-        const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-        const key = ip; // Simple IP-based key
+        // Robust IP Extraction
+        let ip = '';
+        const forwarded = req.headers['x-forwarded-for'];
+
+        if (forwarded) {
+            ip = forwarded.split(',')[0].trim();
+        } else {
+            ip = req.ip || req.socket?.remoteAddress || '';
+        }
+
+        // Final Fallback to unique ID to prevent shared bucket
+        if (!ip) {
+            ip = req.headers['x-request-id'] || crypto.randomUUID();
+        }
+
+        const key = ip; // Normalized IP-based key
 
         const now = Date.now();
         const record = rateLimitMap.get(key);

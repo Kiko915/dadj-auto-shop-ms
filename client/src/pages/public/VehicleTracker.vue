@@ -242,6 +242,24 @@ const currentStepIndex = computed(() => {
     return 0
 })
 
+const getSafeErrorMessage = (error) => {
+    if (!error.response) return 'Unable to connect to server. Please try again.';
+    
+    // Whitelist status codes to safe messages
+    switch (error.response.status) {
+        case 404:
+            return 'Service Order not found. Please check your Reference ID and Plate Number.';
+        case 429:
+            return 'Too many attempts. Please wait a minute before trying again.';
+        case 400:
+            return 'Please provide both Order Reference and Plate Number.';
+        case 500:
+            return 'System error. Please try again later.';
+        default:
+            return 'An unexpected error occurred. Please contact support.';
+    }
+}
+
 const handleSearch = async () => {
     error.value = ''
     isLoading.value = true
@@ -254,7 +272,8 @@ const handleSearch = async () => {
         })
         trackingResult.value = data
     } catch (e) {
-        error.value = e.response?.data?.error || 'Unable to find order. Please check your details.'
+        // Safe error handling with no direct rendering of API text
+        error.value = getSafeErrorMessage(e)
     } finally {
         isLoading.value = false
     }
