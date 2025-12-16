@@ -115,7 +115,6 @@ const onSubmit = handleSubmit(async (values) => {
             mechanicId: values.mechanicId,
             odometer: values.odometer,
             estimatedCompletion: values.estimatedCompletion,
-            estimatedCompletion: values.estimatedCompletion,
             discount: props.estimate.discount ?? 0,
             discountReason: props.estimate.discountReason ?? ''
         })

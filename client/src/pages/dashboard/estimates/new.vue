@@ -74,10 +74,11 @@ const grandTotal = computed(() => {
 
 // --- Watchers: Auto-Discount ---
 watch(selectedCustomer, (newVal) => {
+    // Clear discount reason when customer changes to prevent stale data
+    discountReason.value = ''
+    discount.value = 0
+    
     if (!newVal) return
-
-// Don't auto-apply if already has a specific reason manually entered
-    if (discountReason.value) return
 
     const today = new Date();
     // Parse using Date constructor which handles ISO strings correctly
@@ -85,9 +86,12 @@ watch(selectedCustomer, (newVal) => {
     
     if (newVal.birthday) {
         const birthdayDate = new Date(newVal.birthday)
-        // Check if day and month match today using local time getters
-        if (birthdayDate.getDate() === today.getDate() && birthdayDate.getMonth() === today.getMonth()) {
-            isBirthday = true;
+        // Check if date is valid
+        if (!isNaN(birthdayDate.getTime())) {
+            // Check if day and month match today using local time getters
+            if (birthdayDate.getDate() === today.getDate() && birthdayDate.getMonth() === today.getMonth()) {
+                isBirthday = true;
+            }
         }
     }
 
@@ -196,7 +200,7 @@ onMounted(async () => {
                 }))
                 
                 if (estimate.expiryDate) expiryDate.value = estimate.expiryDate
-                if (estimate.discount) discount.value = Number(estimate.discount)
+                discount.value = Number(estimate.discount ?? 0)
                 if (estimate.discountReason) discountReason.value = estimate.discountReason
             }
         } catch (e) {
@@ -215,7 +219,7 @@ onMounted(async () => {
             if (parsed.vehicleId) selectedVehicleId.value = parsed.vehicleId
             if (parsed.items) items.value = parsed.items
             if (parsed.expiryDate) expiryDate.value = parsed.expiryDate
-            if (parsed.discount) discount.value = parsed.discount
+            discount.value = Number(parsed.discount ?? 0)
             if (parsed.discountReason) discountReason.value = parsed.discountReason
             
             toast.info('Draft restored from previous session')
