@@ -12,7 +12,6 @@ import {
   Loader2, 
   Check,
   Tag,
-  Tag,
   Gift,
   AlertTriangle
 } from 'lucide-vue-next'

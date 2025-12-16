@@ -1,180 +1,518 @@
 <template>
-  <!-- Welcome Section -->
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
-      <p class="text-muted-foreground">
-        Welcome back! Here's what's happening today.
-      </p>
+  <div class="space-y-6 animate-in fade-in duration-500">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b pb-6">
+      <div class="space-y-1">
+        <h1 class="text-3xl font-bold tracking-tight text-foreground">
+            {{ greeting }}, {{ userName }}
+        </h1>
+        <p class="text-muted-foreground flex items-center gap-2 text-sm">
+          <CalendarDays class="w-4 h-4" />
+          {{ currentDate }}
+        </p>
+      </div>
+      <div class="flex items-center space-x-3">
+          
+          <Select v-model="selectedTimeRange">
+            <SelectTrigger class="w-[160px] bg-background">
+                <div class="flex items-center gap-2">
+                    <Filter class="w-4 h-4 text-muted-foreground" />
+                    <SelectValue placeholder="Period" />
+                </div>
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="7days">Last 7 Days</SelectItem>
+                <SelectItem value="30days">Last 30 Days</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="lastMonth">Last Month</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button size="lg" class="gap-2 shadow-sm bg-slate-900 hover:bg-slate-800 text-white">
+                <PlusCircle class="h-4 w-4" />
+                Quick Create
+                <ChevronDown class="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-56">
+              <DropdownMenuLabel>Create New</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="router.push('/dashboard/estimates/new')">
+                <ClipboardList class="mr-2 h-4 w-4" />
+                <span>New Estimate</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="router.push('/dashboard/service-orders/new')">
+                <Wrench class="mr-2 h-4 w-4" />
+                <span>Direct Service Order</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem @click="router.push('/dashboard/inventory')">
+                 <Package class="mr-2 h-4 w-4" />
+                 <span>Manage Inventory</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+      </div>
     </div>
 
-      <!-- Stats Cards -->
-      <div v-if="dashboardStats" class="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Total Users</CardTitle>
-            <Users class="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold">{{ dashboardStats.totalUsers }}</div>
-            <p class="text-xs text-muted-foreground">All registered users</p>
-          </CardContent>
-        </Card>
+    <!-- AI Insight -->
+    <AIInsightCard v-if="stats" :stats="stats" :urgent-jobs="stats.dueToday || []" />
 
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Active Users</CardTitle>
-            <CheckCircle class="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-green-600">{{ dashboardStats.activeUsers }}</div>
-            <p class="text-xs text-muted-foreground">Currently active</p>
-          </CardContent>
-        </Card>
+    <!-- KPI Grid -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <KPIStatsCard
+        title="Active Jobs"
+        :value="stats?.activeJobs || 0"
+        description="Vehicles in service"
+        :icon="Wrench"
+        variant="blue"
+        @click="router.push('/dashboard/service-orders?status=IN_PROGRESS')"
+      />
+      <KPIStatsCard
+        title="Today's Sales"
+        :value="formatCurrency(stats?.todaysSales || 0)"
+        description="Gross revenue today"
+        :icon="DollarSign"
+        variant="green"
+      />
+      <KPIStatsCard
+        title="Low Inventory"
+        :value="stats?.lowInventory || 0"
+        description="Items below reorder point"
+        :icon="Package"
+        variant="red"
+        @click="router.push('/dashboard/inventory/reports')"
+      />
+      <KPIStatsCard
+        title="Pending Approvals"
+        :value="stats?.pendingApprovals || 0"
+        description="Estimates awaiting action"
+        :icon="FileClock"
+        variant="amber"
+        @click="router.push('/dashboard/estimates?status=PENDING')"
+      />
+    </div>
 
-        <Card>
-          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Inactive Users</CardTitle>
-            <AlertCircle class="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div class="text-2xl font-bold text-red-600">{{ dashboardStats.inactiveUsers }}</div>
-            <p class="text-xs text-muted-foreground">Need attention</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- Loading State -->
-      <div v-else class="grid gap-4 md:grid-cols-3">
-        <Card v-for="i in 3" :key="i">
+    <!-- Main Content Grid -->
+    <div class="grid gap-6 md:grid-cols-3">
+      
+      <!-- Operational Column (Left 2/3) -->
+      <div class="md:col-span-2 space-y-6">
+        
+        <!-- Revenue Trend (Line Chart) -->
+        <Card class="col-span-1">
           <CardHeader>
-            <Skeleton class="h-4 w-[100px]" />
+            <CardTitle>Revenue Trend</CardTitle>
+            <CardDescription>Income performance over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <Skeleton class="h-8 w-[60px] mb-2" />
-            <Skeleton class="h-3 w-[120px]" />
+             <div class="h-[300px] w-full">
+                <Line v-if="revenueChartData" :data="revenueChartData" :options="revenueChartOptions" />
+                <div v-else class="h-full flex items-center justify-center text-muted-foreground">
+                    Loading chart...
+                </div>
+             </div>
           </CardContent>
+        </Card>
+
+        <!-- Priority / Due Today -->
+        <Card>
+          <CardHeader>
+            <CardTitle>Priority Jobs</CardTitle>
+            <CardDescription>Scheduled for completion today</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OperationalTable :orders="stats?.dueToday" :loading="isLoading" />
+          </CardContent>
+        </Card>
+
+        <!-- Top Moving Parts -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Top Moving Parts</CardTitle>
+                <CardDescription>Highest volume inventory items</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="h-[300px] w-full">
+                    <Bar :data="topPartsChartData" :options="topPartsChartOptions" />
+                </div>
+            </CardContent>
         </Card>
       </div>
 
-      <!-- User Information -->
-      <Card>
-        <CardHeader>
-          <CardTitle>User Information</CardTitle>
-          <CardDescription>Your current session details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div class="space-y-1">
-              <dt class="text-sm font-medium text-muted-foreground">Email</dt>
-              <dd class="text-sm">{{ authStore.userEmail }}</dd>
-            </div>
-            <div class="space-y-1">
-              <dt class="text-sm font-medium text-muted-foreground">Status</dt>
-              <dd>
-                <Badge variant="outline" class="bg-green-50 text-green-700 border-green-200">
-                  <div class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></div>
-                  Authenticated
-                </Badge>
-              </dd>
-            </div>
-            <div class="space-y-1">
-              <dt class="text-sm font-medium text-muted-foreground">Role</dt>
-              <dd>
-                <Badge>{{ dashboardStats?.currentUser?.role || 'Loading...' }}</Badge>
-              </dd>
-            </div>
-            <div class="space-y-1">
-              <dt class="text-sm font-medium text-muted-foreground">Login Time</dt>
-              <dd class="text-sm">{{ currentTime }}</dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
+      <!-- Quick Actions Column (Right 1/3) -->
+      <div class="space-y-6">
+        
+        <!-- Quick Links -->
+        <Card>
+          <CardHeader>
+             <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent class="grid gap-3">
+            <Button variant="outline" class="w-full justify-start h-12 text-base font-normal border-slate-200 hover:border-blue-500 hover:text-blue-600 transition-all" @click="router.push('/dashboard/estimates/new')">
+                <PlusCircle class="mr-3 h-5 w-5" />
+                New Estimate
+            </Button>
+            <Button variant="outline" class="w-full justify-start h-12 text-base font-normal border-slate-200 hover:border-blue-500 hover:text-blue-600 transition-all" @click="router.push('/dashboard/billing')">
+                <CreditCard class="mr-3 h-5 w-5" />
+                New Counter Sale
+            </Button>
+            <Button variant="outline" class="w-full justify-start h-12 text-base font-normal border-slate-200 hover:border-blue-500 hover:text-blue-600 transition-all" @click="router.push('/dashboard/customers')">
+                <UserPlus class="mr-3 h-5 w-5" />
+                Register Customer
+            </Button>
+          </CardContent>
+        </Card>
 
-      <!-- Quick Actions -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and shortcuts</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Button variant="outline" class="justify-start h-auto py-4" @click="router.push('/dashboard/customers')">
-              <Users class="mr-2 h-5 w-5" />
-              <div class="text-left">
-                <div class="font-medium">Manage Customers</div>
-                <div class="text-xs text-muted-foreground">View and edit customer data</div>
+        <!-- Shop Capacity -->
+        <Card>
+           <CardHeader>
+             <CardTitle>Shop Capacity</CardTitle>
+             <CardDescription>Bay utilization</CardDescription>
+           </CardHeader>
+           <CardContent class="space-y-6">
+              <div class="h-[220px] w-full flex items-center justify-center relative">
+                 <Doughnut :data="capacityChartData" :options="capacityChartOptions" />
+                 <div class="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                    <span class="text-4xl font-bold tracking-tighter text-slate-900">{{ stats?.shopCapacity?.current || 0 }}</span>
+                    <span class="text-sm text-muted-foreground font-medium">of {{ stats?.shopCapacity?.total || 10 }} Bays</span>
+                 </div>
               </div>
-            </Button>
-            <Button variant="outline" class="justify-start h-auto py-4" @click="router.push('/dashboard/services')">
-              <Car class="mr-2 h-5 w-5" />
-              <div class="text-left">
-                <div class="font-medium">Vehicle Services</div>
-                <div class="text-xs text-muted-foreground">Manage service records</div>
+              <div class="flex items-center justify-between text-sm px-4">
+                  <div class="flex items-center gap-2">
+                       <span class="w-3 h-3 rounded-full bg-slate-900"></span>
+                       <span class="text-muted-foreground">Occupied</span>
+                  </div>
+                  <span class="font-medium">{{ Math.round(capacityPercentage) }}%</span>
               </div>
-            </Button>
-            <Button variant="outline" class="justify-start h-auto py-4" @click="router.push('/dashboard/settings')">
-              <Settings class="mr-2 h-5 w-5" />
-              <div class="text-left">
-                <div class="font-medium">Settings</div>
-                <div class="text-xs text-muted-foreground">Configure your preferences</div>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+           </CardContent>
+        </Card>
+
+        <!-- Service Order Status -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Service Status</CardTitle>
+                <CardDescription>Current workflow distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="h-[250px] w-full flex items-center justify-center">
+                    <Doughnut :data="statusChartData" :options="statusChartOptions" />
+                </div>
+            </CardContent>
+        </Card>
+      </div>
+
     </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import OperationalTable from '@/components/dashboard/OperationalTable.vue'
+import KPIStatsCard from '@/components/dashboard/KPIStatsCard.vue'
+import AIInsightCard from '@/components/dashboard/AIInsightCard.vue'
+import { Wrench, DollarSign, Package, FileClock, PlusCircle, CreditCard, UserPlus, ChevronDown, ClipboardList, Settings, Filter, CalendarDays } from 'lucide-vue-next'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { CheckCircle, Users, Car, Settings, AlertCircle } from 'lucide-vue-next'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useSEO } from '@/composables/useSEO'
+import { Doughnut, Bar, Line } from 'vue-chartjs'
+import { 
+    Chart as ChartJS, 
+    ArcElement, 
+    Tooltip, 
+    Legend, 
+    BarElement, 
+    CategoryScale, 
+    LinearScale, 
+    PointElement, 
+    LineElement, 
+    Filler 
+} from 'chart.js'
 
-// SEO Configuration
+ChartJS.register(
+    ArcElement, 
+    Tooltip, 
+    Legend, 
+    BarElement, 
+    CategoryScale, 
+    LinearScale, 
+    PointElement, 
+    LineElement, 
+    Filler
+)
+
+// SEO
 useSEO({
-  title: 'Dashboard',
-  description: 'DADJ Auto Shop customer dashboard. View your service history, schedule appointments, and manage your vehicle information.',
-  keywords: 'dashboard, customer portal, vehicle services, appointment scheduling, service history',
-  type: 'website'
+  title: 'Command Center',
+  description: 'Manager Dashboard for shop overview',
 })
 
 const router = useRouter()
 const authStore = useAuthStore()
-const currentTime = ref('')
-const dashboardStats = ref(null)
+const stats = ref(null)
 const isLoading = ref(true)
+const selectedTimeRange = ref('7days')
 
-// Initialize component
-onMounted(async () => {
-  currentTime.value = new Date().toLocaleString()
-  await loadDashboardData()
+const userName = computed(() => {
+    return stats.value?.currentUser?.name || authStore.user?.name || 'Admin'
 })
 
-// Load dashboard data from protected API
-const loadDashboardData = async () => {
-  try {
-    isLoading.value = true
-    const response = await api.get('/protected/dashboard-stats')
-    dashboardStats.value = response.data.stats
-  } catch (error) {
-    console.error('Failed to load dashboard data:', error)
-  } finally {
-    isLoading.value = false
-  }
+const greeting = computed(() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good Morning'
+    if (hour < 18) return 'Good Afternoon'
+    return 'Good Evening'
+})
+
+const currentDate = ref('')
+let dateTimeInterval = null
+
+// Initialize
+onMounted(async () => {
+    updateDateTime()
+    dateTimeInterval = setInterval(updateDateTime, 60000) 
+    await loadData()
+})
+
+onUnmounted(() => {
+    if (dateTimeInterval) {
+        clearInterval(dateTimeInterval)
+        dateTimeInterval = null
+    }
+})
+
+const updateDateTime = () => {
+    const now = new Date()
+    currentDate.value = now.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+    })
+}
+
+const loadData = async () => {
+    try {
+        isLoading.value = true
+        const res = await api.get('/protected/dashboard-stats', {
+            params: { timeRange: selectedTimeRange.value }
+        })
+        stats.value = res.data.stats
+    } catch (e) {
+        console.error('Failed to load dashboard:', e)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+watch(selectedTimeRange, () => {
+    loadData()
+})
+
+// Helpers
+const formatCurrency = (val) => {
+    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val)
+}
+
+const formatDateShort = (dateStr) => {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+const capacityPercentage = computed(() => {
+    const capacity = stats.value?.shopCapacity
+    if (!capacity || !capacity.total || capacity.total <= 0) return 0
+    const pct = (capacity.current / capacity.total) * 100
+    return Math.min(Math.max(pct, 0), 100)
+})
+
+// --- Charts Configuration ---
+// Using a standard Blue/Indigo that acts as "Primary"
+const PRIMARY_COLOR = '#3b82f6'; // Blue-500
+
+// 1. Revenue Trend (Line Chart)
+const revenueChartData = computed(() => {
+    const trend = stats.value?.revenueTrend || []
+    return {
+        labels: trend.map(d => formatDateShort(d.date)),
+        datasets: [{
+            label: 'Revenue',
+            data: trend.map(d => d.amount),
+            borderColor: PRIMARY_COLOR,
+            backgroundColor: (ctx) => {
+                const canvas = ctx.chart.ctx;
+                const gradient = canvas.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)'); // Blue-500 at 20%
+                gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+                return gradient;
+            },
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: PRIMARY_COLOR,
+            pointBorderWidth: 2
+        }]
+    }
+})
+
+const revenueChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            backgroundColor: '#0f172a',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            padding: 10,
+            cornerRadius: 4,
+            displayColors: false,
+            callbacks: {
+                label: (context) => formatCurrency(context.raw)
+            }
+        }
+    },
+    scales: {
+        x: {
+            grid: { display: false },
+            ticks: { color: '#64748b', font: { size: 11 } }
+        },
+        y: {
+            border: { display: false },
+            grid: { color: '#f1f5f9', borderDash: [4, 4] },
+            ticks: { 
+                color: '#64748b', 
+                font: { size: 11 },
+                callback: (value) => '₱' + value / 1000 + 'k' 
+            },
+            beginAtZero: true
+        }
+    }
+}
+
+// 2. Shop Capacity (Doughnut)
+const capacityChartData = computed(() => {
+    const current = stats.value?.shopCapacity?.current || 0
+    const total = stats.value?.shopCapacity?.total || 10
+    const available = Math.max(0, total - current)
+    
+    let occupiedColor = PRIMARY_COLOR
+    if (current / total >= 0.8) occupiedColor = '#ef4444' // Red if super busy
+
+    return {
+        labels: ['Occupied', 'Available'],
+        datasets: [{
+            backgroundColor: [occupiedColor, '#f1f5f9'],
+            data: [current, available],
+            borderWidth: 0,
+            hoverOffset: 4
+        }]
+    }
+})
+
+const capacityChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '85%', 
+    plugins: { legend: { display: false }, tooltip: { enabled: false } } // Custom center text used instead
+}
+
+// 3. Service Status (Doughnut)
+const statusChartData = computed(() => {
+    const data = stats.value?.charts?.orderStatus
+    if (!data) return { labels: [], datasets: [] }
+
+    return {
+        labels: ['Pending', 'In Progress', 'Completed', 'Cancelled'],
+        datasets: [{
+            backgroundColor: ['#fbbf24', PRIMARY_COLOR, '#10b981', '#cbd5e1'], // Amber, Primary, Emerald, Slate
+            data: [
+                data.PENDING || 0, 
+                data.IN_PROGRESS || 0, 
+                data.COMPLETED || 0, 
+                data.CANCELLED || 0
+            ],
+            borderWidth: 0,
+            hoverOffset: 10
+        }]
+    }
+})
+
+const statusChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '60%',
+    plugins: {
+        legend: { 
+            position: 'right', 
+            labels: { usePointStyle: true, boxWidth: 8, padding: 15, font: { size: 12 } } 
+        }
+    }
+}
+
+// 4. Top Moving Parts (Bar)
+const topPartsChartData = computed(() => {
+    const parts = stats.value?.charts?.topParts || []
+    
+    return {
+        labels: parts.map(p => p.name),
+        datasets: [{
+            label: 'Qty Sold',
+            backgroundColor: PRIMARY_COLOR, 
+            borderRadius: 4,
+            barPercentage: 0.6,
+            data: parts.map(p => p.quantity)
+        }]
+    }
+})
+
+const topPartsChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            backgroundColor: '#0f172a',
+            padding: 10,
+            cornerRadius: 4,
+            displayColors: false
+        }
+    },
+    scales: {
+        x: { 
+            beginAtZero: true,
+            grid: { display: false },
+            ticks: { color: '#64748b' }
+        },
+        y: {
+            grid: { display: false },
+            ticks: { color: '#0f172a', font: { weight: '500' } }
+        }
+    }
 }
 </script>

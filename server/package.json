@@ -21,6 +21,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^1.33.0",
     "@prisma/adapter-neon": "^6.17.1",
     "@prisma/client": "^6.17.1",
     "@sentry/node": "^10.29.0",

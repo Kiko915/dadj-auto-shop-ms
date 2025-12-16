@@ -20,6 +20,7 @@ import usersRoutes from './routes/users.js';
 import serviceRoutes from './routes/service-orders.js';
 import paymentRoutes from './routes/payment.js';
 import financialReports from './routes/financial-reports.js';
+import aiRoutes from './routes/ai.js';
 
 // --- Initialization ---
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/service-orders', serviceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/reports', financialReports);
+app.use('/api/ai', aiRoutes);
 
 app.listen(PORT, () => {
     // Use template literals for cleaner console logging
