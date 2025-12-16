@@ -78,9 +78,11 @@ watch(selectedCustomer, (newVal) => {
     const birthDate = newVal.birthday ? new Date(newVal.birthday) : null;
     let isBirthday = false;
 
-    if (birthDate) {
-        // Check if day and month match
-        if (birthDate.getDate() === today.getDate() && birthDate.getMonth() === today.getMonth()) {
+    if (newVal.birthday) {
+        // Parse as local date by splitting the ISO string to avoid UTC conversion issues
+        const [year, month, day] = newVal.birthday.split('T')[0].split('-').map(Number)
+        // Check if day and month match today
+        if (day === today.getDate() && month === today.getMonth() + 1) {
             isBirthday = true;
         }
     }
@@ -90,12 +92,16 @@ watch(selectedCustomer, (newVal) => {
 
     // Priority: Birthday > VIP > Loyal
     if (isBirthday) {
-        toast.success(`🎉 It's ${newVal.firstName}'s Birthday! Recommendation: Apply Birthday Discount.`)
+        toast.success(`🎉 It's ${newVal.firstName}'s Birthday! Eligible for Birthday Discount. Please check amount.`)
         discountReason.value = "Birthday Discount"
+        // Optionally auto-apply a default birthday discount
+        // discount.value = 500
     } else if (isVIP || isLoyal) {
         const type = isVIP ? 'VIP' : 'Loyal';
         toast.info(`💎 Customer is ${type}. Eligible for loyalty discount.`)
         discountReason.value = `${type} Loyalty Discount`
+        // Optionally auto-apply a loyalty discount
+        // discount.value = isVIP ? 200 : 100
     } else {
         // Reset if manually changing customers unless manually overridden? 
         // Safer to reset to avoid applying wrong discount to wrong person

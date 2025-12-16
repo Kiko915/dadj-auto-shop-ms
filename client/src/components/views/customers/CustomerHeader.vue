@@ -58,9 +58,10 @@ const loyaltyColor = computed(() => {
 
 const isBirthdayToday = computed(() => {
   if (!props.customer.birthday) return false
-  const date = new Date(props.customer.birthday)
+  // Parse as local date by splitting the ISO string to avoid UTC conversion issues
+  const [year, month, day] = props.customer.birthday.split('T')[0].split('-').map(Number)
   const today = new Date()
-  return date.getDate() === today.getDate() && date.getMonth() === today.getMonth()
+  return day === today.getDate() && month === today.getMonth() + 1
 })
 
 const formattedTotalSpent = computed(() => {

@@ -45,9 +45,10 @@ const getFullName = (customer: Customer) => {
 
 const isBirthdayToday = (dateString?: string | null) => {
   if (!dateString) return false
-  const date = new Date(dateString)
+  // Parse as local date by splitting the ISO string to avoid UTC conversion issues
+  const [year, month, day] = dateString.split('T')[0].split('-').map(Number)
   const today = new Date()
-  return date.getDate() === today.getDate() && date.getMonth() === today.getMonth()
+  return day === today.getDate() && month === today.getMonth() + 1
 }
 
 const handleCheckboxChange = () => {
