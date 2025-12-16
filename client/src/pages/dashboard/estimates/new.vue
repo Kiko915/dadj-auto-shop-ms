@@ -10,7 +10,8 @@ import {
   Check,
   Save,
   Pencil,
-  BadgePercent
+  BadgePercent,
+  AlertTriangle
 } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +39,13 @@ const expiryDate = ref('')
 const discount = ref(0)
 const discountReason = ref('')
 const isSubmitting = ref(false)
+// --- Helpers ---
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP'
+    }).format(amount)
+}
 
 // --- Computed ---
 
@@ -53,6 +61,12 @@ const laborTotal = computed(() => {
     .reduce((sum, i) => sum + (i.price * i.quantity), 0)
 })
 
+const subtotal = computed(() => partsTotal.value + laborTotal.value)
+
+const isDiscountExcessive = computed(() => {
+    return discount.value < 0 || discount.value > subtotal.value
+})
+
 const grandTotal = computed(() => {
     const total = partsTotal.value + laborTotal.value - discount.value
     return total > 0 ? total : 0
@@ -62,15 +76,17 @@ const grandTotal = computed(() => {
 watch(selectedCustomer, (newVal) => {
     if (!newVal) return
 
-    // Don't auto-apply if already has a specific reason manually entered, unless it matches standard ones
-    // Actually, for better UX, we just toast suggestions like in Service Orders
+// Don't auto-apply if already has a specific reason manually entered
+    if (discountReason.value) return
 
     const today = new Date();
-    // Parse as local date by splitting the ISO string to avoid UTC conversion issues
+    // Parse using Date constructor which handles ISO strings correctly
     let isBirthday = false;
+    
     if (newVal.birthday) {
-        const [year, month, day] = newVal.birthday.split('T')[0].split('-').map(Number)
-        if (day === today.getDate() && month === today.getMonth() + 1) {
+        const birthdayDate = new Date(newVal.birthday)
+        // Check if day and month match today using local time getters
+        if (birthdayDate.getDate() === today.getDate() && birthdayDate.getMonth() === today.getMonth()) {
             isBirthday = true;
         }
     }
@@ -93,7 +109,7 @@ watch(selectedCustomer, (newVal) => {
 // --- Actions: Estimate ---
 
 const saveEstimate = async (status = 'PENDING') => {
-  if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0) return
+  if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0 || isDiscountExcessive.value) return
 
   isSubmitting.value = true
   try {
@@ -226,14 +242,14 @@ onMounted(async () => {
         <Button 
             variant="secondary"
             @click="saveEstimate('DRAFT')" 
-            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0"
+            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
         >
             <Save class="w-4 h-4 mr-2" />
             Save Draft
         </Button>
         <Button 
             @click="saveEstimate('PENDING')" 
-            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0"
+            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
             class="min-w-[140px]"
         >
           <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-2 animate-spin" />
@@ -274,7 +290,13 @@ onMounted(async () => {
                         v-model.number="discount" 
                         placeholder="0.00" 
                         min="0"
+                        :max="subtotal"
+                        :class="{'border-destructive focus-visible:ring-destructive': isDiscountExcessive}"
                     />
+                    <div v-if="isDiscountExcessive" class="flex items-center gap-1.5 text-xs text-destructive font-medium animate-in fade-in-0 slide-in-from-top-1">
+                        <AlertTriangle class="h-3.5 w-3.5" />
+                        Discount cannot exceed grand total ({{ formatCurrency(subtotal) }}) or be negative.
+                    </div>
                 </div>
                 <div class="grid gap-2">
                     <Label>Reason / Note</Label>

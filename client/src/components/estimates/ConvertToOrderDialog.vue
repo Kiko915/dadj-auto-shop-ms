@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertCircle, CheckCircle2, AlertTriangle, User, Calendar as CalendarIcon, Gauge, Wrench, PackageCheck, Loader2, Info, Check, X } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2, AlertTriangle, User, Calendar as CalendarIcon, Gauge, Wrench, PackageCheck, Loader2, Info, Check, X, BadgePercent } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { useForm } from 'vee-validate'
 import * as z from 'zod'
@@ -115,8 +115,9 @@ const onSubmit = handleSubmit(async (values) => {
             mechanicId: values.mechanicId,
             odometer: values.odometer,
             estimatedCompletion: values.estimatedCompletion,
-            discount: props.estimate.discount,
-            discountReason: props.estimate.discountReason
+            estimatedCompletion: values.estimatedCompletion,
+            discount: props.estimate.discount ?? 0,
+            discountReason: props.estimate.discountReason ?? ''
         })
         
         toast.success(`Service Order created successfully!`)
@@ -219,6 +220,20 @@ const onSubmit = handleSubmit(async (values) => {
                             Last recorded: <span class="font-medium">{{ estimate.vehicle?.mileage || 0 }} km</span>
                         </p>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Discount Info (if any) -->
+        <div v-if="estimate.discount > 0" class="flex items-start gap-4 p-3 bg-red-50/50 rounded-lg border border-red-100">
+            <div class="p-2 bg-white rounded-md border border-red-100 shadow-sm text-red-600">
+                 <BadgePercent class="h-5 w-5" />
+            </div>
+            <div class="flex-1 space-y-1">
+                <Label class="text-sm font-medium text-red-900">Discount Applied</Label>
+                <div class="flex items-center gap-2 text-sm text-red-700">
+                    <span class="font-bold">- ₱{{ estimate.discount }}</span>
+                    <span v-if="estimate.discountReason" class="text-red-600/80">({{ estimate.discountReason }})</span>
                 </div>
             </div>
         </div>

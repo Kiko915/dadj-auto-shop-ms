@@ -12,7 +12,9 @@ import {
   Loader2, 
   Check,
   Tag,
-  Gift
+  Tag,
+  Gift,
+  AlertTriangle
 } from 'lucide-vue-next'
 
 // Modular Components (Reusing Estimate components as they are identical for item building)
@@ -31,6 +33,14 @@ const items = ref([])
 const isSubmitting = ref(false)
 const discount = ref(0)
 const discountReason = ref('')
+
+// --- Helpers ---
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP'
+    }).format(amount)
+}
 
 // --- Lifecycle ---
 
@@ -64,7 +74,15 @@ const laborTotal = computed(() => {
 // --- Actions ---
 
 const grandTotalBeforeDiscount = computed(() => partsTotal.value + laborTotal.value)
-const grandTotal = computed(() => Math.max(0, grandTotalBeforeDiscount.value - discount.value))
+
+const isDiscountExcessive = computed(() => {
+    return discount.value < 0 || discount.value > grandTotalBeforeDiscount.value
+})
+
+const grandTotal = computed(() => {
+    const total = grandTotalBeforeDiscount.value - discount.value
+    return total > 0 ? total : 0
+})
 
 // Auto-apply discount logic
 watch(selectedCustomer, (newVal) => {
@@ -111,7 +129,7 @@ watch(selectedCustomer, (newVal) => {
 })
 
 const saveOrder = async () => {
-  if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0) return
+  if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0 || isDiscountExcessive.value) return
 
   isSubmitting.value = true
   try {
@@ -164,7 +182,7 @@ const saveOrder = async () => {
         <Button variant="outline" @click="$router.back()">Cancel</Button>
         <Button 
             @click="saveOrder" 
-            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0"
+            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
             class="min-w-[140px]"
         >
           <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-2 animate-spin" />
@@ -200,7 +218,19 @@ const saveOrder = async () => {
             <CardContent class="pt-4 space-y-4">
                 <div class="space-y-2">
                      <Label class="text-xs">Discount Amount (₱)</Label>
-                     <Input type="number" step="0.01" min="0" v-model="discount" placeholder="0.00" />
+                     <Input 
+                        type="number" 
+                        step="0.01" 
+                        min="0" 
+                        :max="grandTotalBeforeDiscount"
+                        v-model="discount" 
+                        placeholder="0.00" 
+                        :class="{'border-destructive focus-visible:ring-destructive': isDiscountExcessive}"
+                    />
+                    <div v-if="isDiscountExcessive" class="flex items-center gap-1.5 text-xs text-destructive font-medium animate-in fade-in-0 slide-in-from-top-1">
+                        <AlertTriangle class="h-3.5 w-3.5" />
+                        Discount cannot exceed grand total ({{ formatCurrency(grandTotalBeforeDiscount) }}) or be negative.
+                    </div>
                 </div>
                 <div class="space-y-2">
                      <Label class="text-xs">Reason / Promo Code</Label>
