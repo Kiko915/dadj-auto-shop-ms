@@ -33,17 +33,41 @@ const escapeHtml = (unsafe) => {
         .replace(/'/g, "&#039;");
 }
 
-export function generateReceiptHtml(order, payment) {
-    const totalAmount = Number(order.totalAmount);
-    // For receipt view, we can show total paid so far inclusive of this payment or just this payment.
-    // Standard receipt usually shows invoice details.
+export function generateReceiptHtml(initialOrder, initialPayment) {
+    // 1. Input Validation
+    if (!initialOrder || typeof initialOrder !== 'object') {
+        console.error('generateReceiptHtml: Invalid or missing order object');
+        return '';
+    }
+    // Safe defaults in case payment is null/undefined
+    const payment = initialPayment || { date: null, amount: 0, method: 'N/A' };
+    const order = initialOrder;
 
-    // Correctly accessing amountPaid from the numeric field in ServiceOrder model
-    const amountPaidSoFar = Number(order.amountPaid) || 0;
+    // 2. Numeric Coercion & Defaults
+    // Ensure we don't get NaN
+    const totalAmount = Number.isFinite(Number(order.totalAmount)) ? Number(order.totalAmount) : 0;
+    const amountPaidSoFar = Number.isFinite(Number(order.amountPaid)) ? Number(order.amountPaid) : 0;
     const balanceRemaining = Math.max(0, totalAmount - amountPaidSoFar);
 
-    const formatCurrency = (val) => '₱' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const paymentDate = new Date(payment.date).toLocaleDateString();
+    const formatCurrency = (val) => '₱' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Fallback for payment.date
+    let paymentDate = 'N/A';
+    if (payment && payment.date) {
+        try {
+            paymentDate = new Date(payment.date).toLocaleDateString();
+            if (paymentDate === 'Invalid Date') paymentDate = new Date().toLocaleDateString();
+        } catch (e) {
+            paymentDate = new Date().toLocaleDateString();
+        }
+    } else {
+        paymentDate = new Date().toLocaleDateString(); // Default to today for fresh receipts
+    }
+
+    // 3. Safe Accessors for Nested Properties
+    const customer = order.customer || { firstName: 'Guest', lastName: '', phoneNumber: 'N/A' };
+    const vehicle = order.vehicle || { make: 'Unknown', model: 'Vehicle', licensePlate: 'N/A' };
+    const items = Array.isArray(order.items) ? order.items : [];
 
     return `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8fafc; padding: 20px;">
@@ -75,13 +99,13 @@ export function generateReceiptHtml(order, payment) {
                         <tr>
                             <td style="width: 50%; vertical-align: top;">
                                 <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Bill To</p>
-                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(order.customer.firstName)} ${escapeHtml(order.customer.lastName)}</p>
-                                <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">${escapeHtml(order.customer.phoneNumber)}</p>
+                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(customer.firstName)} ${escapeHtml(customer.lastName)}</p>
+                                <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">${escapeHtml(customer.phoneNumber)}</p>
                             </td>
                             <td style="width: 50%; vertical-align: top; text-align: right;">
                                 <p style="margin: 0 0 5px; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Vehicle Details</p>
-                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(order.vehicle.make)} ${escapeHtml(order.vehicle.model)}</p>
-                                <span style="display: inline-block; background-color: #f1f5f9; color: #475569; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-top: 4px;">${escapeHtml(order.vehicle.licensePlate)}</span>
+                                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b;">${escapeHtml(vehicle.make)} ${escapeHtml(vehicle.model)}</p>
+                                <span style="display: inline-block; background-color: #f1f5f9; color: #475569; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-top: 4px;">${escapeHtml(vehicle.licensePlate)}</span>
                             </td>
                         </tr>
                     </table>
@@ -97,7 +121,7 @@ export function generateReceiptHtml(order, payment) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${order.items.map(item => `
+                            ${items.map(item => `
                             <tr style="border-bottom: 1px solid #f8fafc;">
                                 <td style="padding: 12px 30px; vertical-align: top;">
                                     <p style="margin: 0; font-size: 14px; font-weight: 500; color: #334155;">${escapeHtml(item.name)}</p>

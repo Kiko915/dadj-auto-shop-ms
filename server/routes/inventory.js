@@ -418,8 +418,8 @@ async function findDeadStock(allItems, sixMonthsAgo) {
 
             const lastSoldDate = lastSale?.order?.createdAt || null;
             // If never sold, calculate age from creation time (so fresh items don't appear as dead stock)
-            // If creation time is missing (legacy), fallback to large number
-            const effectiveLastDate = lastSoldDate || item.createdAt || new Date(0);
+            // If creation time is missing (legacy), fallback to current date (so they appear as 0 days old and are excluded)
+            const effectiveLastDate = lastSoldDate || item.createdAt || now;
 
             const daysSinceSold = Math.floor((now - new Date(effectiveLastDate)) / (1000 * 60 * 60 * 24));
 
