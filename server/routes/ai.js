@@ -1,12 +1,12 @@
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Initialize Gemini
 // Ensure GEMINI_API_KEY is in your .env file
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
 
 /**
  * @route POST /api/ai/insight
@@ -23,37 +23,51 @@ router.post('/insight', authenticateToken, async (req, res) => {
             });
         }
 
+        // Input Validation
+        if (!stats || typeof stats !== 'object' || Array.isArray(stats)) {
+            return res.status(400).json({ error: 'Invalid stats format. Expected object.' });
+        }
+
+        if (urgentJobs && !Array.isArray(urgentJobs)) {
+            return res.status(400).json({ error: 'Invalid urgentJobs format. Expected array.' });
+        }
+
+        // Initialize Gemini client lazily
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
         // Construct a concise prompt
         const prompt = `
-        Act as a Business Consultant for an Auto Shop. 
+        Act as a Business Consultant for an Auto Shop in the Philippines.
         Here is the live data:
-        - Revenue Today: ${stats.revenueToday}
-        - Active Jobs: ${stats.activeJobs}
-        - Pending Estimates: ${stats.pendingEstimates}
-        - Low Stock Items Count: ${stats.lowStockCount}
-        - Specific Low Stock Items: ${stats.lowStockItems ? stats.lowStockItems.map(i => `${i.name} (${i.quantity})`).join(', ') : 'None'}
-        - Urgent Jobs Due: ${urgentJobs ? urgentJobs.length : 0}
+        - Revenue Today: PHP ${Number(stats.revenueToday || 0)}
+        - Active Jobs: ${Number(stats.activeJobs || 0)}
+        - Pending Estimates: ${Number(stats.pendingEstimates || 0)}
+        - Low Stock Items Count: ${Number(stats.lowStockCount || 0)}
+        - Specific Low Stock Items: ${Array.isArray(stats.lowStockItems) && stats.lowStockItems.length > 0 ? stats.lowStockItems.map(i => `${i.name} (${i.quantity})`).join(', ') : 'None'}
+        - Urgent Jobs Due: ${Array.isArray(urgentJobs) ? urgentJobs.length : 0}
 
         Write a concise, 3-sentence summary.
         1. First sentence: Assess financial performance (Good/Low).
         2. Second sentence: Highlight the most urgent operational risk (Low stock or Overdue jobs).
         3. Third sentence: Give one specific recommendation.
         
-        Keep it professional, direct, and under 60 words.
+        Keep it professional, direct, and under 60 words. Always use "PHP" or "₱" for currency.
         `;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+        });
 
-        res.json({ insight: text });
+        // The new SDK returns response.text as a property/getter
+        res.json({ insight: response.text });
 
     } catch (error) {
-        console.error('AI Insight Error:', error);
+        const errorId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        console.error(`AI Insight Error [${errorId}]:`, error);
         res.status(500).json({
             error: 'Failed to generate insight',
-            details: error.message
+            errorId
         });
     }
 });

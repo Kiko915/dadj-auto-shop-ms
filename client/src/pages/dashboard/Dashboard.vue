@@ -171,7 +171,7 @@
         <Card>
            <CardHeader>
              <CardTitle>Shop Capacity</CardTitle>
-             <CardDescription>Bay utlization</CardDescription>
+             <CardDescription>Bay utilization</CardDescription>
            </CardHeader>
            <CardContent class="space-y-6">
               <div class="h-[220px] w-full flex items-center justify-center relative">
@@ -210,7 +210,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api'
@@ -286,12 +286,20 @@ const greeting = computed(() => {
 })
 
 const currentDate = ref('')
+let dateTimeInterval = null
 
 // Initialize
 onMounted(async () => {
     updateDateTime()
-    setInterval(updateDateTime, 60000) 
+    dateTimeInterval = setInterval(updateDateTime, 60000) 
     await loadData()
+})
+
+onUnmounted(() => {
+    if (dateTimeInterval) {
+        clearInterval(dateTimeInterval)
+        dateTimeInterval = null
+    }
 })
 
 const updateDateTime = () => {
@@ -333,8 +341,10 @@ const formatDateShort = (dateStr) => {
 }
 
 const capacityPercentage = computed(() => {
-    if (!stats.value?.shopCapacity) return 0
-    return (stats.value.shopCapacity.current / stats.value.shopCapacity.total) * 100
+    const capacity = stats.value?.shopCapacity
+    if (!capacity || !capacity.total || capacity.total <= 0) return 0
+    const pct = (capacity.current / capacity.total) * 100
+    return Math.min(Math.max(pct, 0), 100)
 })
 
 // --- Charts Configuration ---

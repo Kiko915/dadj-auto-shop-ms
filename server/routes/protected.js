@@ -83,6 +83,7 @@ router.get('/dashboard-stats', authenticateToken, authorizeRoles(['STAFF', 'admi
     // Calculate Filtering Query Dates
     const now = new Date();
     let startDate = new Date();
+    let endDate = new Date();
 
     switch (timeRange) {
       case 'today':
@@ -102,6 +103,10 @@ router.get('/dashboard-stats', authenticateToken, authorizeRoles(['STAFF', 'admi
         startDate.setMonth(startDate.getMonth() - 1);
         startDate.setDate(1);
         startDate.setHours(0, 0, 0, 0);
+
+        endDate = new Date(); // Start of this month
+        endDate.setDate(1);
+        endDate.setHours(0, 0, 0, 0);
         break;
       default:
         startDate.setDate(now.getDate() - 7);
@@ -124,7 +129,7 @@ router.get('/dashboard-stats', authenticateToken, authorizeRoles(['STAFF', 'admi
       pendingApprovalsCount,
       dueTodayOrders,
       revenueTrend,
-      activeBaysCount,
+      // activeBaysCount removed (redundant)
       totalUsers,
       topPartsRaw,
       orderStatusRaw
@@ -175,30 +180,36 @@ router.get('/dashboard-stats', authenticateToken, authorizeRoles(['STAFF', 'admi
         orderBy: { date: 'asc' }
       }),
 
-      // 8. Snapshot: Shop Capacity
-      prisma.serviceOrder.count({ where: { status: 'IN_PROGRESS' } }),
+      // 8. Snapshot: Shop Capacity (REMOVED - Redundant with activeJobs)
+      // prisma.serviceOrder.count({ where: { status: 'IN_PROGRESS' } }),
 
-      // 9. User stats
+      // 8. User stats
       prisma.user.count(),
 
-      // 10. Filtered Chart 1: Top Moving Parts
+      // 9. Filtered Chart 1: Top Moving Parts
       prisma.$queryRaw`
         SELECT i.name, SUM(soi.quantity) as total_quantity
         FROM service_order_items soi
         JOIN service_orders so ON soi.order_id = so.order_id
         LEFT JOIN inventory_items i ON soi.inventory_item_id = i.id
         WHERE so.created_at >= ${startDate}
+        AND so.created_at < ${endDate}
         AND soi.inventory_item_id IS NOT NULL
         GROUP BY i.name
         ORDER BY total_quantity DESC
         LIMIT 5
       `,
 
-      // 11. Filtered Chart 2: Order Status Distribution
+      // 10. Filtered Chart 2: Order Status Distribution
       prisma.serviceOrder.groupBy({
         by: ['status'],
         _count: { status: true },
-        where: { createdAt: { gte: startDate } }
+        where: {
+          createdAt: {
+            gte: startDate,
+            lt: endDate
+          }
+        }
       })
     ]);
 
@@ -250,7 +261,7 @@ router.get('/dashboard-stats', authenticateToken, authorizeRoles(['STAFF', 'admi
       dueToday: dueTodayOrders,
       revenueTrend: formattedTrend,
       shopCapacity: {
-        current: activeBaysCount,
+        current: activeJobsCount, // Reuse activeJobsCount
         total: 10
       },
       charts: {
