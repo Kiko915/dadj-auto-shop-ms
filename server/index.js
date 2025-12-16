@@ -21,6 +21,7 @@ import serviceRoutes from './routes/service-orders.js';
 import paymentRoutes from './routes/payment.js';
 import financialReports from './routes/financial-reports.js';
 import aiRoutes from './routes/ai.js';
+import publicRoutes from './routes/public.js';
 
 // --- Initialization ---
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/service-orders', serviceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/reports', financialReports);
+app.use('/api/public', publicRoutes);
 app.use('/api/ai', aiRoutes);
 
 app.listen(PORT, () => {
