@@ -28,6 +28,8 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             expiryDate,
             laborTotal,
             partsTotal,
+            discount,
+            discountReason,
             totalAmount,
             items
         } = req.body;
@@ -67,8 +69,9 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
             });
         }
 
-        // Validate Totals
-        const totals = { laborTotal, partsTotal, totalAmount };
+
+        // Validate Totals & Discount
+        const totals = { laborTotal, partsTotal, totalAmount, discount };
         for (const [key, value] of Object.entries(totals)) {
             if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
                 return res.status(400).json({
@@ -76,6 +79,15 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                     error: 'INVALID_TOTAL'
                 });
             }
+        }
+
+        // Validate Discount vs Total
+        const calculatedSubtotal = (Number(laborTotal || 0) + Number(partsTotal || 0));
+        if (discount > calculatedSubtotal) {
+            return res.status(400).json({
+                message: 'Discount cannot exceed the subtotal amount',
+                error: 'INVALID_DISCOUNT'
+            });
         }
 
         // Validate expiryDate
@@ -183,6 +195,8 @@ router.post('/', authenticateToken, authorizeRoles(['staff', 'admin']), async (r
                         expiryDate: validExpiryDate,
                         laborTotal: laborTotal || 0,
                         partsTotal: partsTotal || 0,
+                        discount: discount || 0,
+                        discountReason: discountReason || null,
                         totalAmount: totalAmount || 0,
                         items: {
                             create: validItems
@@ -381,6 +395,8 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             expiryDate,
             laborTotal,
             partsTotal,
+            discount,
+            discountReason,
             totalAmount,
             items
         } = req.body;
@@ -401,7 +417,7 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
             });
         }
 
-        const totals = { laborTotal, partsTotal, totalAmount };
+        const totals = { laborTotal, partsTotal, totalAmount, discount };
         for (const [key, value] of Object.entries(totals)) {
             if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
                 return res.status(400).json({
@@ -505,6 +521,8 @@ router.put('/:id', authenticateToken, authorizeRoles(['staff', 'admin']), async 
                     expiryDate: validExpiryDate, // Use the validated date or undefined if not provided
                     laborTotal: laborTotal ?? undefined,
                     partsTotal: partsTotal ?? undefined,
+                    discount: discount ?? undefined,
+                    discountReason: discountReason ?? undefined,
                     totalAmount: totalAmount ?? undefined,
                     items: items ? {
                         create: validItems

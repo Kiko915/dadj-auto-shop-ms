@@ -203,9 +203,11 @@ model Estimate {
   status EstimateStatus @default(PENDING)
 
   // Financials (Only totals, no payments yet)
-  laborTotal  Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
-  partsTotal  Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
-  totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
+  laborTotal     Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
+  partsTotal     Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
+  discount       Decimal @default(0) @map("discount") @db.Decimal(10, 2)
+  discountReason String? @map("discount_reason")
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
 
   // Relations
   customerId String   @map("customer_id")

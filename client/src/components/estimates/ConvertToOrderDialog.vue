@@ -114,7 +114,9 @@ const onSubmit = handleSubmit(async (values) => {
             estimateId: props.estimate.id,
             mechanicId: values.mechanicId,
             odometer: values.odometer,
-            estimatedCompletion: values.estimatedCompletion
+            estimatedCompletion: values.estimatedCompletion,
+            discount: props.estimate.discount,
+            discountReason: props.estimate.discountReason
         })
         
         toast.success(`Service Order created successfully!`)
