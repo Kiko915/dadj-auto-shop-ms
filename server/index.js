@@ -33,7 +33,7 @@ const PORT = process.env.PORT || 4000;
 // 1. CORS Middleware
 const corsOptions = {
     // Defined once using const/let
-    origin: ['http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173'],
+    origin: ['http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173', process.env.CLIENT_URL].filter(Boolean),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
 };
