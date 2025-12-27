@@ -54,13 +54,22 @@ router.post('/insight', authenticateToken, async (req, res) => {
         Keep it professional, direct, and under 60 words. Always use "PHP" or "₱" for currency.
         `;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+        // Add Timeout (10s)
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('AI Request Timed Out')), 10000)
+        );
+
+        const requestPromise = ai.models.generateContent({
+            model: "gemini-2.5-flash-lite",
             contents: prompt,
         });
 
-        // The new SDK returns response.text as a property/getter
-        res.json({ insight: response.text });
+        const response = await Promise.race([requestPromise, timeoutPromise]);
+
+        // Handle text extraction safely (function vs property)
+        const text = typeof response.text === 'function' ? response.text() : response.text;
+
+        res.json({ insight: text });
 
     } catch (error) {
         const errorId = Date.now().toString(36) + Math.random().toString(36).substr(2);

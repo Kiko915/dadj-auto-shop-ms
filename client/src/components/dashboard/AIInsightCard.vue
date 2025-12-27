@@ -63,13 +63,12 @@ const props = defineProps({
     }
 })
 
-const isAnalyzing = ref(true)
+const isAnalyzing = ref(false)
 const insight = ref('')
 
 const generateInsight = async () => {
     // Prevent spam if stats aren't ready
-    if (!props.stats || !props.stats.activeJobs) {
-        console.log('Waiting for stats to load...')
+    if (!props.stats) {
         return
     }
 
