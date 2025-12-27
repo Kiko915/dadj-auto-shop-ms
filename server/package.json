@@ -5,13 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js",
-    "start": "node index.js",
-    
+    "dev": "nodemon --import ./instrument.js index.js",
+    "start": "node --import ./instrument.js index.js",
     "prisma:migrate": "npx prisma migrate dev --name",
     "prisma:generate": "npx prisma generate",
-    
-    "postinstall": "npm run prisma:generate" 
+    "postinstall": "npm run prisma:generate"
   },
   "keywords": [
     "node",
@@ -23,13 +21,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^1.33.0",
+    "@prisma/adapter-neon": "^6.17.1",
+    "@prisma/client": "^6.17.1",
+    "@sentry/node": "^10.29.0",
+    "@sentry/profiling-node": "^10.29.0",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "@prisma/adapter-neon": "^6.17.1", 
-    "@prisma/client": "^6.17.1"
+    "imagekit": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "nanoid": "^5.1.6",
+    "newrelic": "^13.7.0",
+    "nodemailer": "^7.0.9"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.17.1"
   }

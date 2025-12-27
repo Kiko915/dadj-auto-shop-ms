@@ -10,18 +10,392 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url  	    = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  id             String  @id @default(cuid())
+  email          String  @unique
+  name           String?
+  password       String
+  role           String  @default("staff") // staff, admin, mechanic
+  isActive       Boolean @default(true)
+  profilePicture String? // URL or path to profile picture
+
+  // Address fields
+  region   String?
+  province String?
+  city     String?
+  barangay String?
+  street   String?
+  country  String  @default("Philippines")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  passwordResets        PasswordReset[]
+  sessions              UserSession[]
+  mechanicServiceOrders ServiceOrder[]  @relation("MechanicServiceOrders")
+  serviceOrders         ServiceOrder[]  @relation("UserServiceOrders")
+
   @@map("users")
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  email     String
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  deviceInfo   String? // e.g., "Windows 10"
+  browser      String? // e.g., "Chrome 120"
+  ipAddress    String?
+  userAgent    String?
+  location     String? // e.g., "Philippines"
+  lastActivity DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("user_sessions")
+}
+
+model Customer {
+  id             String    @id @default(cuid()) @map("customer_id")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  middleName     String?   @map("middle_name")
+  suffix         String?
+  phoneNumber    String    @map("phone_number")
+  email          String?   @unique
+  birthday       DateTime? @map("birthday") @db.Date
+  profilePicture String?   @map("customer_profile_picture") // ImageKit URL
+  imageFileId    String?   @map("image_file_id") // ImageKit File ID
+  notes          String?   @db.Text
+  isActive       Boolean   @default(true) @map("is_active")
+  loyaltyStatus  String    @default("Regular") @map("loyalty_status") // Regular, Loyal, VIP
+  totalVehicles  Int       @default(0) @map("total_vehicles")
+  serviceCount   Int       @default(0) @map("service_count")
+  totalSpent     Decimal   @default(0) @map("total_spent") @db.Decimal(10, 2)
+
+  dateCreated   DateTime       @default(now()) @map("date_created")
+  lastModified  DateTime       @updatedAt @map("last_modified")
+  vehicles      Vehicle[]
+  serviceOrders ServiceOrder[]
+  estimates     Estimate[]
+
+  @@map("customers")
+}
+
+model Vehicle {
+  id             String   @id @default(cuid()) @map("vehicle_id")
+  customerId     String   @map("customer_id")
+  licensePlate   String   @unique @map("license_plate") @db.VarChar(20)
+  make           String   @db.VarChar(100)
+  model          String   @db.VarChar(100)
+  year           Int?
+  vin            String?  @unique @db.VarChar(17)
+  mileage        Int?
+  vehicleType    String?  @map("vehicle_type")
+  color          String?  @db.VarChar(50)
+  notes          String?  @db.Text
+  imageUrl       String?  @map("image_url") // Optional vehicle image
+  imageFileId    String?  @map("image_file_id") // ImageKit File ID
+  dateRegistered DateTime @default(now()) @map("date_registered")
+
+  // Relations
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceOrders ServiceOrder[]
+  estimates     Estimate[]
+
+  @@index([customerId])
+  @@map("vehicles")
+}
+
+model InventoryItem {
+  id       Int    @id @default(autoincrement())
+  name     String // e.g., "Synthetic Oil 5W-30"
+  brand    String // Vital: Client struggles finding parts for specific brands like "Ford" 
+  category String @default("General") // e.g., "Maintenance", "Tires", "Engine"
+
+  // Stock Management
+  quantity          Int @default(0) // Tracks current levels to "prevent overstocking" 
+  lowStockThreshold Int @default(5) // Custom trigger for the "Red" warning on the dashboard
+
+  // Financials
+  buyingPrice  Decimal @db.Decimal(10, 2) // Required to calculate "overall profit" 
+  sellingPrice Decimal @db.Decimal(10, 2) // Required for generating receipts
+
+  // Optional Fields
+  imageUrl    String? // Marked optional as requested
+  imageFileId String? // ImageKit File ID for deletion
+  description String? // For extra details (e.g., compatible car models)
+  sku         String? @unique // Barcode/Stock Keeping Unit (Good for future scanning)
+  targetStock Int? // Custom target stock level for restock recommendations
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  serviceOrderItems ServiceOrderItem[]
+  estimateItems     EstimateItem[]
+
+  @@map("inventory_items")
+}
+
+// --- Service Order Feature ---
+enum EstimateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum ItemType {
+  PART
+  LABOR
+}
+
+model Estimate {
+  id     String         @id @default(cuid()) @map("estimate_id")
+  status EstimateStatus @default(PENDING)
+
+  // Financials (Only totals, no payments yet)
+  laborTotal     Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
+  partsTotal     Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
+  discount       Decimal @default(0) @map("discount") @db.Decimal(10, 2)
+  discountReason String? @map("discount_reason")
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  // Relations
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  // One-to-Many Relations
+  items EstimateItem[]
+
+  // Link to the eventual Service Order
+  // If this is null, the estimate hasn't been turned into a job yet
+  convertedServiceOrder ServiceOrder?
+
+  // Dates
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  expiryDate DateTime? @map("expiry_date") // Optional: Quote valid until...
+
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("estimates")
+}
+
+model EstimateItem {
+  id         String   @id @default(cuid()) @map("estimate_item_id")
+  estimateId String   @map("estimate_id")
+  type       ItemType // PART or LABOR
+
+  // Item Details
+  name        String
+  description String?
+  quantity    Int     @default(1)
+
+  // Pricing
+  price Decimal @db.Decimal(10, 2)
+  total Decimal @db.Decimal(10, 2)
+
+  // Inventory Relation
+  // We link this to check current price/stock, but we DO NOT deduct stock yet
+  inventoryItemId Int?           @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // Relation
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@map("estimate_items")
+}
+
+model ServiceOrder {
+  id     String      @id @default(cuid()) @map("order_id")
+  status OrderStatus @default(PENDING)
+
+  // Financials
+  // We separate parts and labor to help with the "itemized receipt" requirement
+  laborTotal     Decimal @default(0) @map("labor_total") @db.Decimal(10, 2)
+  partsTotal     Decimal @default(0) @map("parts_total") @db.Decimal(10, 2)
+  discount       Decimal @default(0) @map("discount") @db.Decimal(10, 2)
+  discountReason String? @map("discount_reason")
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  // Installment / Debt Tracking
+  amountPaid Decimal @default(0) @map("amount_paid") @db.Decimal(10, 2)
+
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status") // UNPAID, PARTIAL, PAID
+
+  // Relations
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vehicleId String  @map("vehicle_id")
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  sourceEstimateId String?                  @unique @map("source_estimate_id")
+  sourceEstimate   Estimate?                @relation(fields: [sourceEstimateId], references: [id])
+  // One-to-Many Relations
+  items            ServiceOrderItem[]
+  payments         Payment[]
+  attachments      ServiceOrderAttachment[]
+
+  // Dates
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  estimatedCompletion DateTime? @map("estimated_completion")
+  notes               String?   @map("notes") @db.Text
+
+  // Mechanic Assignment
+  mechanicId String? @map("mechanic_id")
+  mechanic   User?   @relation("MechanicServiceOrders", fields: [mechanicId], references: [id])
+
+  // Vehicle Snapshot
+  odometer Int?
+  user     User?   @relation("UserServiceOrders", fields: [userId], references: [id])
+  userId   String?
+
+  advisories  ServiceOrderAdvisory[]
+  noteEntries ServiceOrderNote[]
+
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("service_orders")
+}
+
+model ServiceOrderAdvisory {
+  id      String @id @default(cuid()) @map("advisory_id")
+  orderId String @map("order_id")
+
+  content  String @db.Text
+  severity String @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+
+  // Evidence
+  imageUrl    String? @map("image_url")
+  imageFileId String? @map("image_file_id") // ImageKit ID
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("service_order_advisories")
+}
+
+model ServiceOrderItem {
+  id      String   @id @default(cuid()) @map("item_id")
+  orderId String   @map("order_id")
+  type    ItemType // PART or LABOR
+
+  // Item Details
+  name        String // e.g., "Change Oil Labor" or "Ford Oil Filter"
+  description String?
+  quantity    Int     @default(1)
+
+  // Pricing
+  price Decimal @db.Decimal(10, 2) // The price AT THE TIME of sale (Snapshot)
+  total Decimal @db.Decimal(10, 2) // price * quantity
+
+  // Inventory Relation (Optional because Labor has no inventory ID)
+  // NOTE: Your InventoryItem uses an Int ID, so this must be Int
+  inventoryItemId Int?           @map("inventory_item_id")
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // Relation back to Order
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("service_order_items")
+}
+
+model Payment {
+  id      String @id @default(cuid()) @map("payment_id")
+  orderId String @map("order_id")
+
+  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod @default(CASH)
+  referenceNo String?       @map("reference_no") // For GCash Ref Numbers
+  date        DateTime      @default(now())
+  notes       String?       @db.Text
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model ServiceOrderAttachment {
+  id      String @id @default(cuid()) @map("attachment_id")
+  orderId String @map("order_id")
+
+  imageUrl   String   @map("image_url") // The ImageKit URL
+  fileId     String?  @map("file_id") // For deleting later
+  caption    String? // e.g., "Rusted brake caliper - Before"
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  // Relation
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("service_order_attachments")
+}
+
+model ServiceOrderNote {
+  id        String       @id @default(cuid()) @map("note_id")
+  orderId   String       @map("order_id")
+  order     ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  content   String       @db.Text
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@map("service_order_notes")
 }
