@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -36,13 +36,13 @@ api.interceptors.response.use(
     // Handle common errors
     if (error.response?.status === 401) {
       const errorCode = error.response?.data?.error
-      
+
       // Only auto-logout for session-related errors, not for invalid credentials
       if (errorCode === 'EXPIRED_TOKEN') {
         toast.error('Session Expired', {
           description: 'Your session has expired. Please log in again.'
         })
-        
+
         // Clear auth state and redirect
         const authStore = useAuthStore()
         authStore.logout()
@@ -51,7 +51,7 @@ api.interceptors.response.use(
         toast.error('Session Terminated', {
           description: 'This session was logged out from another device.'
         })
-        
+
         // Clear auth state and redirect
         const authStore = useAuthStore()
         authStore.logout()
