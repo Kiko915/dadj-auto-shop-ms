@@ -20,7 +20,7 @@ const checkConnectivity = async () => {
 
   try {
     // Ping the server root
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000'
     await fetch(baseUrl, { 
       method: 'HEAD', 
       cache: 'no-store',

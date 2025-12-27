@@ -178,21 +178,47 @@
         </div>
 
         <!-- Timeline Steps -->
-        <div class="p-8 bg-white">
-             <div class="relative pl-4 space-y-8 before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                <div v-for="(step, index) in steps" :key="index" class="relative pl-8">
-                     <!-- Dot -->
-                     <div 
-                        class="absolute left-0 top-1 w-7 h-7 rounded-full border-4 transition-all duration-500 z-10"
-                        :class="getStepDotClass(index)"
-                    >
-                         <div v-if="currentStepIndex === index" class="absolute inset-0 rounded-full animate-ping bg-blue-500 opacity-20 transform scale-150"></div>
+        <div class="px-8 py-10 bg-white">
+             <!-- Steps Container -->
+             <div class="space-y-0">
+                <div v-for="(step, index) in steps" :key="index" class="relative flex gap-6 pb-12 last:pb-0">
+                     
+                     <!-- Left Column: Icon & Connector -->
+                     <div class="flex flex-col items-center flex-shrink-0 relative">
+                        <!-- Connecting Line (except last item) -->
+                        <div v-if="index !== steps.length - 1" 
+                             class="absolute top-10 bottom-[-48px] w-0.5 transition-colors duration-700 ease-in-out z-0"
+                             :class="currentStepIndex > index ? 'bg-emerald-500' : 'bg-slate-100'"
+                        ></div>
+
+                        <!-- Icon Circle -->
+                        <div 
+                            class="w-12 h-12 rounded-full flex items-center justify-center border-4 z-10 bg-white transition-all duration-500 relative"
+                            :class="getStepCircleClass(index)"
+                        >
+                             <!-- Ping Effect for Active -->
+                             <div v-if="currentStepIndex === index" class="absolute inset-0 rounded-full animate-ping bg-blue-500 opacity-20"></div>
+                             
+                             <!-- Icon -->
+                             <component :is="step.icon" class="w-5 h-5 transition-transform duration-500" :class="currentStepIndex === index ? 'scale-110' : ''" />
+                        </div>
                      </div>
 
-                     <!-- Content -->
-                     <div :class="currentStepIndex >= index ? 'opacity-100' : 'opacity-40 grayscale'">
-                        <h4 class="text-sm font-bold text-slate-900 uppercase tracking-wide">{{ step.title }}</h4>
-                        <p class="text-sm text-slate-500 mt-1 leading-relaxed">{{ step.description }}</p>
+                     <!-- Right Column: Text Content -->
+                     <div class="pt-2 transition-all duration-500" :class="getContentClass(index)">
+                        <h4 
+                            class="text-sm font-bold uppercase tracking-wider transition-colors duration-300"
+                            :class="currentStepIndex === index ? 'text-blue-600' : 'text-slate-900'"
+                        >
+                            {{ step.title }}
+                        </h4>
+                        <p class="text-sm text-slate-500 mt-1 leading-relaxed font-medium">{{ step.description }}</p>
+                        
+                        <!-- Active Indicator -->
+                        <div v-if="currentStepIndex === index" class="mt-3 flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-widest animate-pulse">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                            In Progress
+                        </div>
                     </div>
                 </div>
              </div>
@@ -216,6 +242,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import api from '@/api'
+import { ClipboardList, Wrench, Check } from 'lucide-vue-next'
 
 const searchForm = ref({
     orderId: '',
@@ -227,9 +254,9 @@ const error = ref('')
 const isLoading = ref(false)
 
 const steps = [
-    { title: 'Order Received', description: 'We have received your vehicle and details.' },
-    { title: 'Work in Progress', description: 'Technicians are actively performing the repairs.' },
-    { title: 'Ready for Pickup', description: 'Final quality check complete. Come get your car!' }
+    { title: 'Order Received', description: 'We have received your vehicle and details.', icon: ClipboardList },
+    { title: 'Work in Progress', description: 'Technicians are actively performing the repairs.', icon: Wrench },
+    { title: 'Ready for Pickup', description: 'Final quality check complete. Come get your car!', icon: Check }
 ]
 
 const currentStepIndex = computed(() => {
@@ -296,13 +323,21 @@ const statusBadgeClass = computed(() => {
     }
 })
 
-const getStepDotClass = (index) => {
+const getStepCircleClass = (index) => {
     if (currentStepIndex.value > index) {
-        return 'bg-emerald-500 border-white shadow-sm ring-1 ring-emerald-100' // Completed
+        return 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-200 shadow-md' // Completed
     } else if (currentStepIndex.value === index) {
-        return 'bg-blue-600 border-white shadow-lg ring-2 ring-blue-100' // Current
+        return 'bg-white border-blue-600 text-blue-600 shadow-lg ring-4 ring-blue-50' // Current
     } else {
-        return 'bg-slate-100 border-white ring-1 ring-slate-100' // Future
+        return 'bg-white border-slate-200 text-slate-300' // Future
+    }
+}
+
+const getContentClass = (index) => {
+    if (currentStepIndex.value >= index) {
+        return 'opacity-100'
+    } else {
+        return 'opacity-40 blur-[0.5px] grayscale'
     }
 }
 
