@@ -249,7 +249,9 @@ router.post('/forgot-password', async (req, res) => {
         });
 
         // 6. Email content
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/reset-password?token=${resetToken}`;
+        // Improved URL resolution: Use CLIENT_URL (prod) -> FRONTEND_URL (legacy) -> Origin header -> localhost fallback
+        const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
+        const resetUrl = `${appUrl}/auth/reset-password?token=${resetToken}`;
 
         const mailOptions = {
             from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
@@ -302,21 +304,35 @@ router.post('/forgot-password', async (req, res) => {
             `
         };
 
-        // 7. Send email (with error handling for demo purposes)
+        // 7. Send email with improved Promise wrapper
         try {
-            await transporter.sendMail(mailOptions);
-            console.log(`Password reset email sent to: ${user.email}`);
-        } catch (emailError) {
-            console.warn('Email sending failed:', emailError.message);
-            // For development - don't fail the request if email fails
-            // In production, you might want to handle this differently
-        }
+            await new Promise((resolve, reject) => {
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) {
+                        console.error('Email send error:', err);
+                        reject(err);
+                    } else {
+                        console.log(`Password reset email sent to: ${user.email}`);
+                        resolve(info);
+                    }
+                });
+            });
 
-        // 8. Return success response (don't reveal if email sending failed)
-        res.status(200).json({
-            message: 'If an account with this email exists, a password reset link has been sent.',
-            success: true
-        });
+            res.status(200).json({
+                message: 'If an account with this email exists, a password reset link has been sent.',
+                success: true
+            });
+        } catch (emailError) {
+            console.error('Email sending failed:', emailError);
+            // Even if email fails, we might want to return generic success to prevent enumeration,
+            // but for now let's notify the client of the failure if it's critical, 
+            // or just log it and return success (standard security practice).
+            // Retaining original behavior of returning success but logging error.
+            res.status(200).json({
+                message: 'If an account with this email exists, a password reset link has been sent.',
+                success: true
+            });
+        }
 
     } catch (error) {
         console.error('Forgot password error:', error);
