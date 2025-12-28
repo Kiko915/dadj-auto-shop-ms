@@ -274,14 +274,18 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
 
         // Send Email with wrapper and AWAIT it
         const transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') : ''
             },
             tls: {
                 rejectUnauthorized: false
-            }
+            },
+            connectionTimeout: 60000,
+            socketTimeout: 60000
         });
 
         // Use origin for dynamic fallback if CLIENT_URL is not set
