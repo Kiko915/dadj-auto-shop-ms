@@ -283,7 +283,7 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD
+                pass: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') : ''
             },
             tls: {
                 rejectUnauthorized: false
@@ -364,6 +364,13 @@ router.put('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
         if (!existingUser) {
             return res.status(404).json({
                 error: 'User not found'
+            });
+        }
+
+        // Prevent admin from deactivating themselves
+        if (isActive === false && String(id) === String(req.user.id)) {
+            return res.status(400).json({
+                error: 'You cannot deactivate your own account'
             });
         }
 
@@ -572,6 +579,64 @@ router.patch('/:id/activate', authenticateToken, authorizeRoles('admin'), async 
         console.error('Activate user error:', error);
         res.status(500).json({
             error: 'Failed to activate user',
+            message: error.message
+        });
+    }
+});
+
+
+/**
+ * @route DELETE /api/users/:id/hard
+ * @description Permanently delete a user (Hard delete)
+ * @access Admin only
+ */
+router.delete('/:id/hard', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminId = req.user.id;
+
+        // Prevent admin from deleting themselves
+        if (String(id) === String(adminId)) {
+            return res.status(400).json({
+                error: 'You cannot delete your own account'
+            });
+        }
+
+        // Check if user exists
+        const user = await prisma.user.findUnique({
+            where: { id }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        // Hard delete - delete user and all related data
+        // First delete manually handled relations if needed, e.g. sessions
+        await prisma.userSession.deleteMany({ where: { userId: id } });
+        await prisma.passwordReset.deleteMany({ where: { userId: id } });
+
+        const deletedUser = await prisma.user.delete({
+            where: { id }
+        });
+
+        console.log(`User PERMANENTLY deleted by admin: ${deletedUser.email}`);
+
+        res.status(200).json({
+            message: 'User permanently deleted successfully',
+            user: deletedUser
+        });
+    } catch (error) {
+        console.error('Hard delete user error:', error);
+        if (error.code === 'P2003') {
+            return res.status(400).json({
+                error: 'Cannot delete user because they have associated records (e.g. Orders, Estimates). Deactivate them instead.'
+            });
+        }
+        res.status(500).json({
+            error: 'Failed to delete user',
             message: error.message
         });
     }

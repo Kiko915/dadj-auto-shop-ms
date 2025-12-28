@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Mail,
-  Calendar
+  Calendar,
+  Trash2
 } from 'lucide-vue-next'
 import {
   Card,
@@ -61,7 +62,8 @@ const emit = defineEmits([
   'page-change',
   'edit',
   'deactivate',
-  'activate'
+  'activate',
+  'delete-hard'
 ])
 
 const roleOptions = ['All', 'admin', 'staff', 'mechanic']
@@ -277,6 +279,14 @@ const formatDate = (dateString) => {
                     class="text-green-600 focus:text-green-600"
                   >
                     <UserCheck class="mr-2 h-4 w-4" /> Activate
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    @click="$emit('delete-hard', user)"
+                    class="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    :disabled="user.email === authStore.userEmail"
+                  >
+                    <Trash2 class="mr-2 h-4 w-4" /> Delete Permanently
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

@@ -97,6 +97,21 @@ export const activateUser = async (userId) => {
     }
 }
 
+
+/**
+ * Permanently delete a user (hard delete)
+ * @param {string} userId - User ID
+ * @returns {Promise} Response with success message
+ */
+export const deleteUserPermanent = async (userId) => {
+    try {
+        const response = await api.delete(`/users/${userId}/hard`)
+        return response.data
+    } catch (error) {
+        throw error
+    }
+}
+
 /**
  * Get all mechanics
  * @returns {Promise} Response with mechanics array
