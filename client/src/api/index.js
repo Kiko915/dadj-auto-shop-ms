@@ -1,8 +1,12 @@
 // api/index.js - Axios configuration
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import { useServerStatusStore } from '@/stores/serverStatus'
 import router from '@/router'
 import { toast } from 'vue-sonner'
+
+let coldStartTimer = null
+
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -20,6 +24,20 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // Cold start detection
+    // Only set if not already waking up to avoid resetting on parallel requests
+    const serverStatusStore = useServerStatusStore()
+    /* 
+      We don't want to trigger this for every request, just if one hangs for > 10s.
+      If a request is already pending and timer is running, let it run.
+    */
+    if (!coldStartTimer && !serverStatusStore.isWakingUp) {
+      coldStartTimer = setTimeout(() => {
+        serverStatusStore.setWakingUp(true)
+      }, 10000)
+    }
+
     return config
   },
   (error) => {
@@ -30,6 +48,15 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
+    // Clear cold start timer on success
+    if (coldStartTimer) {
+      clearTimeout(coldStartTimer)
+      coldStartTimer = null
+    }
+    const serverStatusStore = useServerStatusStore()
+    if (serverStatusStore.isWakingUp) {
+      serverStatusStore.setWakingUp(false)
+    }
     return response
   },
   (error) => {
@@ -60,6 +87,16 @@ api.interceptors.response.use(
       // For INVALID_PASSWORD and other 401 errors, just pass through to component
       // Don't auto-logout as it might be user error (wrong password, etc.)
     }
+    // Clear cold start timer on error as well
+    if (coldStartTimer) {
+      clearTimeout(coldStartTimer)
+      coldStartTimer = null
+    }
+    const serverStatusStore = useServerStatusStore()
+    if (serverStatusStore.isWakingUp) {
+      serverStatusStore.setWakingUp(false)
+    }
+
     return Promise.reject(error)
   }
 )

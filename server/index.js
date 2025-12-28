@@ -59,7 +59,14 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/reports', financialReports);
 app.use('/api/public', publicRoutes);
+
 app.use('/api/ai', aiRoutes);
+
+// 4. Health Check Endpoint
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
 
 app.listen(PORT, () => {
     // Use template literals for cleaner console logging
