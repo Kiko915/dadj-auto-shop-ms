@@ -304,35 +304,25 @@ router.post('/forgot-password', async (req, res) => {
             `
         };
 
-        // 7. Send email with improved Promise wrapper
-        try {
-            await new Promise((resolve, reject) => {
-                transporter.sendMail(mailOptions, (err, info) => {
-                    if (err) {
-                        console.error('Email send error:', err);
-                        reject(err);
-                    } else {
-                        console.log(`Password reset email sent to: ${user.email}`);
-                        resolve(info);
-                    }
-                });
+        // 7. Send email (with error handling for demo purposes)
+        // NON-BLOCKING: Send in background to prevent 30s timeout
+        new Promise((resolve, reject) => {
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error('Email send error:', err);
+                    reject(err);
+                } else {
+                    console.log(`Password reset email sent to: ${user.email}`);
+                    resolve(info);
+                }
             });
+        }).catch(err => console.error('Background email failed:', err));
 
-            res.status(200).json({
-                message: 'If an account with this email exists, a password reset link has been sent.',
-                success: true
-            });
-        } catch (emailError) {
-            console.error('Email sending failed:', emailError);
-            // Even if email fails, we might want to return generic success to prevent enumeration,
-            // but for now let's notify the client of the failure if it's critical, 
-            // or just log it and return success (standard security practice).
-            // Retaining original behavior of returning success but logging error.
-            res.status(200).json({
-                message: 'If an account with this email exists, a password reset link has been sent.',
-                success: true
-            });
-        }
+        // 8. Return success response immediately
+        res.status(200).json({
+            message: 'If an account with this email exists, a password reset link has been sent.',
+            success: true
+        });
 
     } catch (error) {
         console.error('Forgot password error:', error);
