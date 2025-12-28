@@ -1,6 +1,7 @@
 <script setup>
 import { useSEO } from '@/composables/useSEO'
 import GlobalLoader from '@/components/common/GlobalLoader.vue'
+import ServerAwakeToast from '@/components/common/ServerAwakeToast.vue'
 import { Toaster } from '@/components/ui/sonner'
 import 'vue-sonner/style.css'
 
@@ -17,6 +18,7 @@ useSEO({
   <div id="app">
     <router-view></router-view>
     <GlobalLoader />
+    <ServerAwakeToast />
     <Toaster rich-colors />
   </div>
 </template>
