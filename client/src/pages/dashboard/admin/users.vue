@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { UserPlus } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { toast } from 'vue-sonner'
-import { getAllUsers, deactivateUser, activateUser } from '@/api/users'
+import { getAllUsers, deactivateUser, activateUser, deleteUserPermanent } from '@/api/users'
 import AddUserDialog from '@/components/views/admin/AddUserDialog.vue'
 import EditUserDialog from '@/components/views/admin/EditUserDialog.vue'
 import UserStatsCards from '@/components/views/admin/UserStatsCards.vue'
@@ -50,6 +50,11 @@ const selectedUser = ref(null)
 const isConfirmDialogOpen = ref(false)
 const userToDeactivate = ref(null)
 const isDeactivating = ref(false)
+
+// Delete Dialog State
+const isDeleteDialogOpen = ref(false)
+const userToDelete = ref(null)
+const isDeleting = ref(false)
 
 // Watch search query for debounce
 watch(searchQuery, (newValue) => {
@@ -145,6 +150,35 @@ const confirmDeactivate = async () => {
   }
 }
 
+
+
+const handleHardDelete = (user) => {
+  userToDelete.value = user
+  isDeleteDialogOpen.value = true
+}
+
+const confirmHardDelete = async () => {
+  if (!userToDelete.value) return
+
+  try {
+    isDeleting.value = true
+    await deleteUserPermanent(userToDelete.value.id)
+    toast.success('User Deleted', {
+      description: `${userToDelete.value.name || userToDelete.value.email} has been permanently deleted.`
+    })
+    fetchUsers()
+    isDeleteDialogOpen.value = false
+  } catch (error) {
+    console.error('Failed to delete user:', error)
+    toast.error('Error', {
+      description: error.response?.data?.error || 'Failed to delete user.'
+    })
+  } finally {
+    isDeleting.value = false
+    userToDelete.value = null
+  }
+}
+
 const handleActivate = async (user) => {
   try {
     await activateUser(user.id)
@@ -219,8 +253,10 @@ onBeforeUnmount(() => {
       :total-users="totalUsers"
       @page-change="changePage"
       @edit="openEditDialog"
+
       @deactivate="handleDeactivate"
       @activate="handleActivate"
+      @delete-hard="handleHardDelete"
     />
 
     <!-- Add User Dialog -->
@@ -236,7 +272,7 @@ onBeforeUnmount(() => {
       @updated="handleUserUpdated"
     />
 
-    <!-- Confirmation Dialog -->
+    <!-- Confirmation Dialog (Deactivate) -->
     <ConfirmDialog
       v-model:open="isConfirmDialogOpen"
       title="Deactivate User"
@@ -245,6 +281,17 @@ onBeforeUnmount(() => {
       variant="destructive"
       :loading="isDeactivating"
       @confirm="confirmDeactivate"
+    />
+
+    <!-- Confirmation Dialog (Delete) -->
+    <ConfirmDialog
+      v-model:open="isDeleteDialogOpen"
+      title="Permanently Delete User"
+      :description="`Are you sure you want to PERMANENTLY delete ${userToDelete?.name || 'this user'}? This action CANNOT be undone and will remove all associated data.`"
+      confirm-text="Delete Permanently"
+      variant="destructive"
+      :loading="isDeleting"
+      @confirm="confirmHardDelete"
     />
   </div>
 </template>
