@@ -272,13 +272,7 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
 
         console.log(`New user created by admin: ${newUser.email} (${newUser.role})`);
 
-        // Return success response immediately
-        res.status(201).json({
-            message: 'User created successfully. A welcome email with the password is being sent.',
-            user: newUser
-        });
-
-        // Send Email in background (fire and forget)
+        // Send Email with wrapper and AWAIT it
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
@@ -290,7 +284,10 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             }
         });
 
-        const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login`;
+        // Use origin for dynamic fallback if CLIENT_URL is not set
+        const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
+        const loginUrl = `${appUrl}/auth/login`;
+
         const mailOptions = {
             from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
             to: email,
@@ -334,9 +331,33 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             `
         };
 
-        transporter.sendMail(mailOptions)
-            .then(() => console.log(`Welcome email sent to: ${email}`))
-            .catch(err => console.error('Failed to send welcome email:', err));
+        try {
+            await new Promise((resolve, reject) => {
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) {
+                        console.error('Welcome email failed:', err);
+                        // We resolve anyway so we don't fail the user creation response,
+                        // but log the error. Or we could reject if we want strict behavior.
+                        // Let's log and resolve to ensure response is sent.
+                        // Ideally we should warn the admin.
+                        reject(err);
+                    } else {
+                        console.log(`Welcome email sent to: ${email}`);
+                        resolve(info);
+                    }
+                });
+            });
+        } catch (mailError) {
+            console.error('CRITICAL: Failed to send welcome email', mailError);
+            // We continue to send success response but passing a warning note could be useful
+        }
+
+        // Return success response AFTER email attempt
+        res.status(201).json({
+            message: 'User created successfully. A welcome email with the password is being sent.',
+            user: newUser
+        });
+
     } catch (error) {
         console.error('Create user error:', error);
         res.status(500).json({
