@@ -236,12 +236,12 @@ router.post('/forgot-password', async (req, res) => {
             }
         });
 
-        // 5. Setup email transporter (using explicit config to avoid timeouts)
-        // Using port 587 (TLS) is generally more reliable on cloud hosts than implicit service defaults
+        // 5. Setup email transporter
+        // Trying Port 465 (SMTPS) as Port 587 is timing out
         const transporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
-            port: 587,
-            secure: false, // true for 465, false for other ports
+            port: 465,
+            secure: true, // true for 465, false for other ports
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') : ''
@@ -249,7 +249,7 @@ router.post('/forgot-password', async (req, res) => {
             tls: {
                 rejectUnauthorized: false
             },
-            // Increase timeouts as suggested for slow connections
+            // Keep increased timeouts
             connectionTimeout: 60000,
             socketTimeout: 60000
         });
