@@ -331,28 +331,20 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             `
         };
 
-        try {
-            await new Promise((resolve, reject) => {
-                transporter.sendMail(mailOptions, (err, info) => {
-                    if (err) {
-                        console.error('Welcome email failed:', err);
-                        // We resolve anyway so we don't fail the user creation response,
-                        // but log the error. Or we could reject if we want strict behavior.
-                        // Let's log and resolve to ensure response is sent.
-                        // Ideally we should warn the admin.
-                        reject(err);
-                    } else {
-                        console.log(`Welcome email sent to: ${email}`);
-                        resolve(info);
-                    }
-                });
+        // NON-BLOCKING: Send in background
+        new Promise((resolve, reject) => {
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error('Welcome email failed:', err);
+                    reject(err);
+                } else {
+                    console.log(`Welcome email sent to: ${email}`);
+                    resolve(info);
+                }
             });
-        } catch (mailError) {
-            console.error('CRITICAL: Failed to send welcome email', mailError);
-            // We continue to send success response but passing a warning note could be useful
-        }
+        }).catch(err => console.error('CRITICAL: Failed to send welcome email', err));
 
-        // Return success response AFTER email attempt
+        // Return success response immediately
         res.status(201).json({
             message: 'User created successfully. A welcome email with the password is being sent.',
             user: newUser
