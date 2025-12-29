@@ -1,8 +1,10 @@
+// Imports updated for Mailgun
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
+import FormData from 'form-data';
+import Mailgun from 'mailgun.js';
 import prisma from '../db.js';
 import { parseUserAgent, getClientIp } from '../utils/sessionParser.js';
 
@@ -236,32 +238,23 @@ router.post('/forgot-password', async (req, res) => {
             }
         });
 
-        // 5. Setup email transporter
-        // Trying Port 465 (SMTPS) as Port 587 is timing out
-        const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true, // true for 465, false for other ports
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') : ''
-            },
-            tls: {
-                rejectUnauthorized: false
-            },
-            // Keep increased timeouts
-            connectionTimeout: 60000,
-            socketTimeout: 60000
+        // 5. Setup Mailgun Client
+        const mailgun = new Mailgun(FormData);
+        const mg = mailgun.client({
+            username: 'api',
+            key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
         });
 
+        // Use custom domain from env or fallback to user's production domain
+        const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
+
         // 6. Email content
-        // Improved URL resolution: Use CLIENT_URL (prod) -> FRONTEND_URL (legacy) -> Origin header -> localhost fallback
         const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
         const resetUrl = `${appUrl}/auth/reset-password?token=${resetToken}`;
 
-        const mailOptions = {
-            from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
-            to: user.email,
+        const emailData = {
+            from: process.env.EMAIL_USER || `DADJ Auto Shop <postmaster@${domain}>`,
+            to: [user.email],
             subject: 'Password Reset Request - DADJ Auto Shop MS',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -310,19 +303,10 @@ router.post('/forgot-password', async (req, res) => {
             `
         };
 
-        // 7. Send email (with error handling for demo purposes)
-        // NON-BLOCKING: Send in background to prevent 30s timeout
-        new Promise((resolve, reject) => {
-            transporter.sendMail(mailOptions, (err, info) => {
-                if (err) {
-                    console.error('Email send error:', err);
-                    reject(err);
-                } else {
-                    console.log(`Password reset email sent to: ${user.email}`);
-                    resolve(info);
-                }
-            });
-        }).catch(err => console.error('Background email failed:', err));
+        // 7. Send email via Mailgun (Background)
+        mg.messages.create(domain, emailData)
+            .then(msg => console.log(`Password reset email sent to: ${user.email}`, msg))
+            .catch(err => console.error('Mailgun email failed:', err));
 
         // 8. Return success response immediately
         res.status(200).json({

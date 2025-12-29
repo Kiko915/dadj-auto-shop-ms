@@ -1,7 +1,8 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
+import FormData from 'form-data';
+import Mailgun from 'mailgun.js';
 import prisma from '../db.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import imagekit from '../config/imagekit.js';
@@ -272,29 +273,23 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
 
         console.log(`New user created by admin: ${newUser.email} (${newUser.role})`);
 
-        // Send Email with wrapper and AWAIT it
-        const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') : ''
-            },
-            tls: {
-                rejectUnauthorized: false
-            },
-            connectionTimeout: 60000,
-            socketTimeout: 60000
+        // Setup Mailgun Client
+        const mailgun = new Mailgun(FormData);
+        const mg = mailgun.client({
+            username: 'api',
+            key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
         });
+
+        // Use custom domain from env or fallback to user's production domain
+        const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
 
         // Use origin for dynamic fallback if CLIENT_URL is not set
         const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
         const loginUrl = `${appUrl}/auth/login`;
 
-        const mailOptions = {
-            from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
-            to: email,
+        const emailData = {
+            from: process.env.EMAIL_USER || `DADJ Auto Shop <postmaster@${domain}>`,
+            to: [email],
             subject: 'Welcome to DADJ Auto Shop - Your Account Details',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -335,18 +330,10 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             `
         };
 
-        // NON-BLOCKING: Send in background
-        new Promise((resolve, reject) => {
-            transporter.sendMail(mailOptions, (err, info) => {
-                if (err) {
-                    console.error('Welcome email failed:', err);
-                    reject(err);
-                } else {
-                    console.log(`Welcome email sent to: ${email}`);
-                    resolve(info);
-                }
-            });
-        }).catch(err => console.error('CRITICAL: Failed to send welcome email', err));
+        // Send Email via Mailgun (Background)
+        mg.messages.create(domain, emailData)
+            .then(msg => console.log(`Welcome email sent to: ${email}`, msg))
+            .catch(err => console.error('CRITICAL: Failed to send welcome email', err));
 
         // Return success response immediately
         res.status(201).json({

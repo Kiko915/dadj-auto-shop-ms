@@ -1,20 +1,18 @@
 import express from 'express';
 import prisma from '../db.js';
-import nodemailer from 'nodemailer';
+import FormData from 'form-data';
+import Mailgun from 'mailgun.js';
 import { generateReceiptHtml } from '../utils/receiptGenerator.js';
 
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
+const mailgun = new Mailgun(FormData);
+const mg = mailgun.client({
+    username: 'api',
+    key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
 });
+
+const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
 
 const router = express.Router();
 
@@ -115,9 +113,9 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
                     const balanceRemaining = Math.max(0, totalAmount - amountPaidSoFar);
 
                     // Format utils
-                    const mailOptions = {
-                        from: process.env.EMAIL_USER || 'noreply@dadjauto.shop',
-                        to: order.customer.email,
+                    const emailData = {
+                        from: process.env.EMAIL_USER || `DADJ Auto Shop <postmaster@${domain}>`,
+                        to: [order.customer.email],
                         subject: `Invoice Receipt - Service Order #${orderId}`,
                         html: generateReceiptHtml(order, {
                             amount: paymentAmount,
@@ -127,7 +125,7 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
                         })
                     };
 
-                    await transporter.sendMail(mailOptions);
+                    await mg.messages.create(domain, emailData);
                     console.log(`Receipt email sent for orderId=${orderId}`);
 
                 } catch (emailError) {
