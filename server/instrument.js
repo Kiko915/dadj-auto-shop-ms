@@ -1,8 +1,13 @@
 // server/instrument.js
 import 'dotenv/config';
-import 'newrelic';
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+
+if (process.env.NEW_RELIC_LICENSE_KEY) {
+    await import('newrelic');
+} else {
+    console.log('New Relic disabled: missing NEW_RELIC_LICENSE_KEY');
+}
 
 // Ensure Sentry is initialized before anything else
 Sentry.init({
