@@ -24,15 +24,21 @@ router.post('/login', async (req, res) => {
     try {
         // 1. Validate email and password
         const { email, password } = req.body
+        const normalizedEmail = email?.trim();
 
         // Validate Input
-        if (!email || !password) {
+        if (!normalizedEmail || !password) {
             return res.status(400).json({ message: 'Email and Password are required' });
         }
 
         // 2. Check user exists in database
-        const user = await prisma.user.findUnique({
-            where: { email },
+        const user = await prisma.user.findFirst({
+            where: {
+                email: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive'
+                }
+            },
         });
 
         // Check if the user exist
@@ -202,17 +208,23 @@ router.post('/logout', async (req, res) => {
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
+        const normalizedEmail = email?.trim();
 
         // 1. Validate email input
-        if (!email) {
+        if (!normalizedEmail) {
             return res.status(400).json({
                 message: 'Email is required'
             });
         }
 
         // 2. Check if user exists
-        const user = await prisma.user.findUnique({
-            where: { email }
+        const user = await prisma.user.findFirst({
+            where: {
+                email: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive'
+                }
+            }
         });
 
         if (!user) {
