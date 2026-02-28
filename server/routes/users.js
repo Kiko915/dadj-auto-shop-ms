@@ -1,11 +1,10 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import FormData from 'form-data';
-import Mailgun from 'mailgun.js';
 import prisma from '../db.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 import imagekit from '../config/imagekit.js';
+import { getMailgunClient } from '../utils/mailer.js';
 
 const router = express.Router();
 
@@ -273,25 +272,20 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
 
         console.log(`New user created by admin: ${newUser.email} (${newUser.role})`);
 
-        // Setup Mailgun Client
-        const mailgun = new Mailgun(FormData);
-        const mg = mailgun.client({
-            username: 'api',
-            key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
-        });
-
-        // Use custom domain from env or fallback to user's production domain
-        const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
+        const mailer = await getMailgunClient();
+        const canSendWelcomeEmail = Boolean(mailer);
 
         // Use origin for dynamic fallback if CLIENT_URL is not set
         const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
         const loginUrl = `${appUrl}/auth/login`;
 
-        const emailData = {
-            from: process.env.EMAIL_USER || `DADJ Auto Shop <postmaster@${domain}>`,
-            to: [email],
-            subject: 'Welcome to DADJ Auto Shop - Your Account Details',
-            html: `
+        if (canSendWelcomeEmail) {
+            const { client, domain } = mailer;
+            const emailData = {
+                from: process.env.EMAIL_USER || `DADJ Auto Shop <postmaster@${domain}>`,
+                to: [email],
+                subject: 'Welcome to DADJ Auto Shop - Your Account Details',
+                html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <div style="text-align: center; padding: 20px; background-color: white;">
                         <img src="https://i.ibb.co/997jkKZB/symbol-w-wordmark-primary.png" 
@@ -327,17 +321,21 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
                         <p>© 2025 DADJ Auto Shop. All rights reserved.</p>
                     </div>
                 </div>
-            `
-        };
+                `
+            };
 
-        // Send Email via Mailgun (Background)
-        mg.messages.create(domain, emailData)
-            .then(msg => console.log(`Welcome email sent to: ${email}`, msg))
-            .catch(err => console.error('CRITICAL: Failed to send welcome email', err));
+            client.messages.create(domain, emailData)
+                .then(msg => console.log(`Welcome email sent to: ${email}`, msg))
+                .catch(err => console.error('CRITICAL: Failed to send welcome email', err));
+        } else {
+            console.warn(`Skipping welcome email for ${email}: email service unavailable`);
+        }
 
         // Return success response immediately
         res.status(201).json({
-            message: 'User created successfully. A welcome email with the password is being sent.',
+            message: canSendWelcomeEmail
+                ? 'User created successfully. A welcome email with the password is being sent.'
+                : 'User created successfully. Welcome email was skipped because email service is unavailable.',
             user: newUser
         });
 

@@ -1,12 +1,10 @@
-// Imports updated for Mailgun
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto';
-import FormData from 'form-data';
-import Mailgun from 'mailgun.js';
 import prisma from '../db.js';
 import { parseUserAgent, getClientIp } from '../utils/sessionParser.js';
+import { getMailgunClient } from '../utils/mailer.js';
 
 const router = express.Router();
 
@@ -238,15 +236,16 @@ router.post('/forgot-password', async (req, res) => {
             }
         });
 
-        // 5. Setup Mailgun Client
-        const mailgun = new Mailgun(FormData);
-        const mg = mailgun.client({
-            username: 'api',
-            key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
-        });
+        const mailer = await getMailgunClient();
 
-        // Use custom domain from env or fallback to user's production domain
-        const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
+        if (!mailer) {
+            return res.status(503).json({
+                error: 'Email service unavailable',
+                message: 'Password reset email service is not configured'
+            });
+        }
+
+        const { client, domain } = mailer;
 
         // 6. Email content
         const appUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || req.headers.origin || 'http://localhost:5173';
@@ -304,7 +303,7 @@ router.post('/forgot-password', async (req, res) => {
         };
 
         // 7. Send email via Mailgun (Background)
-        mg.messages.create(domain, emailData)
+        client.messages.create(domain, emailData)
             .then(msg => console.log(`Password reset email sent to: ${user.email}`, msg))
             .catch(err => console.error('Mailgun email failed:', err));
 

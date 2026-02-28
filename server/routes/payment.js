@@ -1,18 +1,9 @@
 import express from 'express';
 import prisma from '../db.js';
-import FormData from 'form-data';
-import Mailgun from 'mailgun.js';
 import { generateReceiptHtml } from '../utils/receiptGenerator.js';
 
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
-
-const mailgun = new Mailgun(FormData);
-const mg = mailgun.client({
-    username: 'api',
-    key: process.env.MAILGUN_API_KEY || process.env.API_KEY,
-});
-
-const domain = process.env.MAILGUN_DOMAIN || 'mail.francismistica.me';
+import { getMailgunClient } from '../utils/mailer.js';
 
 const router = express.Router();
 
@@ -107,10 +98,14 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
         if (order.customer?.email) {
             (async () => {
                 try {
-                    // Recalculate based on updated values
-                    const totalAmount = Number(order.totalAmount);
-                    const amountPaidSoFar = Number(result.updatedOrder.amountPaid);
-                    const balanceRemaining = Math.max(0, totalAmount - amountPaidSoFar);
+                    const mailer = await getMailgunClient();
+
+                    if (!mailer) {
+                        console.warn(`Skipping receipt email for orderId=${orderId}: email service unavailable`);
+                        return;
+                    }
+
+                    const { client, domain } = mailer;
 
                     // Format utils
                     const emailData = {
@@ -125,7 +120,7 @@ router.post('/', authenticateToken, authorizeRoles(['admin', 'staff']), async (r
                         })
                     };
 
-                    await mg.messages.create(domain, emailData);
+                    await client.messages.create(domain, emailData);
                     console.log(`Receipt email sent for orderId=${orderId}`);
 
                 } catch (emailError) {
