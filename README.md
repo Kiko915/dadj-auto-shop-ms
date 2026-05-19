@@ -49,3 +49,40 @@ npm install
 # 3. Install dependencies for the Server (Node.js/Prisma)
 cd ../server
 npm install
+
+---
+
+## 📱 Mobile + NLP Prototype
+
+This project can be wrapped with Capacitor to produce native Android/iOS apps while reusing the existing `client` web app. For a short-term, high-impact NLP prototype we recommend a "Voice → Create Estimate" flow: capture voice, convert to text, send to a server-side NLP endpoint (OpenAI / Hugging Face / Dialogflow), then populate the estimate form.
+
+Quick steps (prototype):
+
+1. In `client`, add Capacitor and scaffold platforms:
+
+```bash
+cd client
+npx cap init dadj-ms com.example.dadjms
+npm run build                       # ensure web assets are ready
+npx cap add android                 # or ios
+npx cap copy
+```
+
+2. Capture voice/text in the app:
+- For fast web prototype: use the Web Speech API (`SpeechRecognition`) in the browser.
+- For native: use `@capacitor-community/speech-recognition` or Capacitor's plugins.
+
+3. Implement a secure server proxy in `server`:
+- Add an endpoint like `POST /api/nlp` that accepts text and calls the chosen NLP API (store API keys only on the server).
+
+4. Minimal NLP flow:
+- Client sends captured text to `server` → `server` calls OpenAI/HuggingFace → returns structured JSON (customer, vehicle, services, parts) → client fills the estimate form.
+
+5. Security & testing:
+- Do NOT store provider API keys in the mobile app. Keep keys in `server` environment variables.
+- Test the web flow first (`npm run dev` in `client`) before running on device/emulator.
+
+Estimated time: 2–5 days for a working prototype (voice capture + OpenAI extraction + auto-fill). If you want, I can scaffold the Capacitor setup and add a minimal voice UI that hits a new `server` endpoint.
+
+See the `client` and `server` folders for development commands and existing API routes.
+
