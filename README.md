@@ -15,6 +15,8 @@ This project is built as a Monorepo, combining a fast frontend with a modern, sc
 | Component | Technology | Rationale |
 | :--- | :--- | :--- |
 | **Client (Frontend)** | **Vue.js** (w/ Pinia & Router) | Interactive, component-based Single Page Application (SPA). |
+| **Mobile (Wrapper)** | **Capacitor** | Wraps the web `client` into native Android/iOS apps with minimal changes; enables native plugins (microphone, file access). |
+| **NLP / AI** | **OpenAI / Hugging Face / Dialogflow (optional)** | Cloud or managed NLP services for voice-to-intent, summarization, and extraction (used via a secure server proxy). |
 | **Server (Backend)** | **Node.js** (w/ Express, ES Modules) | Fast, non-blocking API layer. |
 | **Database (DB)** | **PostgreSQL** (via **NeonDB**) | Scalable, cloud-hosted, serverless relational data store. |
 | **ORM / Data** | **Prisma** (w/ Neon Adapter) | Modern ORM for type-safe and reliable database access. |
