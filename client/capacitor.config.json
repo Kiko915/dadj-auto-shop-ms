@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.app",
+  "appName": "dadj-auto-shop",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

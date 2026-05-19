@@ -325,10 +325,10 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
             };
 
             client.messages.create(domain, emailData)
-                .then(msg => console.log(`Welcome email sent to: ${email}`, msg))
+                .then(msg => console.log('Welcome email sent', { to: email, msg }))
                 .catch(err => console.error('CRITICAL: Failed to send welcome email', err));
         } else {
-            console.warn(`Skipping welcome email for ${email}: email service unavailable`);
+            console.warn('Skipping welcome email: email service unavailable', { to: email });
         }
 
         // Return success response immediately
