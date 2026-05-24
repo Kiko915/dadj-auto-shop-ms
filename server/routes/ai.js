@@ -7,6 +7,10 @@ const router = express.Router();
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null
 console.log('[AI] Groq client:', groqClient ? 'READY' : 'NOT READY');
 
+// In-memory insight cache — keyed by shop/user, TTL 30 minutes
+const insightCache = new Map()
+const INSIGHT_TTL_MS = 30 * 60 * 1000
+
 // Log every request that hits this router
 router.use((req, res, next) => {
   console.log(`[AI router] ${req.method} ${req.path} | auth header: ${req.headers.authorization ? 'present' : 'MISSING'}`)
@@ -15,74 +19,98 @@ router.use((req, res, next) => {
 
 /**
  * @route POST /api/ai/insight
- * @description Generate an executive summary based on shop stats
+ * @description Generate an executive summary based on shop stats.
+ *              Server-side TTL cache (30 min) + Gemini → Groq fallback.
  * @access Private
  */
 router.post('/insight', authenticateToken, async (req, res) => {
     try {
-        const { stats, urgentJobs } = req.body;
+        const { stats, urgentJobs, force } = req.body;
 
-        if (!process.env.GEMINI_API_KEY) {
-            return res.status(503).json({
-                error: 'AI service unavailable (Missing API Key)'
-            });
-        }
-
-        // Input Validation
         if (!stats || typeof stats !== 'object' || Array.isArray(stats)) {
             return res.status(400).json({ error: 'Invalid stats format. Expected object.' });
         }
-
         if (urgentJobs && !Array.isArray(urgentJobs)) {
             return res.status(400).json({ error: 'Invalid urgentJobs format. Expected array.' });
         }
 
-        // Initialize Gemini client lazily
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        // --- Server-side cache check ---
+        const cacheKey = req.user?.shopId || req.user?.id || 'global'
+        if (!force) {
+            const cached = insightCache.get(cacheKey)
+            if (cached && Date.now() - cached.generatedAt < INSIGHT_TTL_MS) {
+                return res.json({ insight: cached.insight, cached: true, generatedAt: cached.generatedAt })
+            }
+        }
 
-        // Construct a concise prompt
-        const prompt = `
-        Act as a Business Consultant for an Auto Shop in the Philippines.
-        Here is the live data:
-        - Revenue Today: PHP ${Number(stats.revenueToday || 0)}
-        - Active Jobs: ${Number(stats.activeJobs || 0)}
-        - Pending Estimates: ${Number(stats.pendingEstimates || 0)}
-        - Low Stock Items Count: ${Number(stats.lowStockCount || 0)}
-        - Specific Low Stock Items: ${Array.isArray(stats.lowStockItems) && stats.lowStockItems.length > 0 ? stats.lowStockItems.map(i => `${i.name} (${i.quantity})`).join(', ') : 'None'}
-        - Urgent Jobs Due: ${Array.isArray(urgentJobs) ? urgentJobs.length : 0}
+        // --- Build prompt ---
+        const prompt = `Act as a Business Consultant for an Auto Shop in the Philippines.
+Here is the live data:
+- Revenue Today: PHP ${Number(stats.revenueToday || 0)}
+- Active Jobs: ${Number(stats.activeJobs || 0)}
+- Pending Estimates: ${Number(stats.pendingEstimates || 0)}
+- Low Stock Items Count: ${Number(stats.lowStockCount || 0)}
+- Specific Low Stock Items: ${Array.isArray(stats.lowStockItems) && stats.lowStockItems.length > 0 ? stats.lowStockItems.map(i => `${i.name} (${i.quantity})`).join(', ') : 'None'}
+- Urgent Jobs Due: ${Array.isArray(urgentJobs) ? urgentJobs.length : 0}
 
-        Write a concise, 3-sentence summary.
-        1. First sentence: Assess financial performance (Good/Low).
-        2. Second sentence: Highlight the most urgent operational risk (Low stock or Overdue jobs).
-        3. Third sentence: Give one specific recommendation.
-        
-        Keep it professional, direct, and under 60 words. Always use "PHP" or "₱" for currency.
-        `;
+Write a concise, 3-sentence summary.
+1. First sentence: Assess financial performance (Good/Low).
+2. Second sentence: Highlight the most urgent operational risk (Low stock or Overdue jobs).
+3. Third sentence: Give one specific recommendation.
 
-        // Add Timeout (10s)
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('AI Request Timed Out')), 10000)
-        );
+Keep it professional, direct, and under 60 words. Always use "PHP" or "₱" for currency.`
 
-        const requestPromise = ai.models.generateContent({
-            model: "gemini-2.5-flash-lite",
-            contents: prompt,
-        });
+        let insight = null
+        let provider = null
 
-        const response = await Promise.race([requestPromise, timeoutPromise]);
+        // --- Provider 1: Gemini ---
+        if (process.env.GEMINI_API_KEY) {
+            try {
+                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Gemini timed out')), 10000)
+                )
+                const response = await Promise.race([
+                    ai.models.generateContent({ model: 'gemini-2.5-flash-lite', contents: prompt }),
+                    timeoutPromise
+                ])
+                const text = typeof response.text === 'function' ? response.text() : response.text
+                if (text) { insight = text; provider = 'gemini' }
+            } catch (e) {
+                console.warn('[insight] Gemini failed, trying Groq fallback:', e.message)
+            }
+        }
 
-        // Handle text extraction safely (function vs property)
-        const text = typeof response.text === 'function' ? response.text() : response.text;
+        // --- Provider 2: Groq fallback ---
+        if (!insight && groqClient) {
+            try {
+                const completion = await groqClient.chat.completions.create({
+                    model: 'llama-3.3-70b-versatile',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.3,
+                    max_tokens: 150,
+                })
+                const text = completion.choices[0]?.message?.content
+                if (text) { insight = text; provider = 'groq' }
+            } catch (e) {
+                console.warn('[insight] Groq fallback also failed:', e.message)
+            }
+        }
 
-        res.json({ insight: text });
+        if (!insight) {
+            return res.status(503).json({ error: 'AI service unavailable. Both providers failed.' })
+        }
+
+        // --- Cache the result ---
+        const generatedAt = Date.now()
+        insightCache.set(cacheKey, { insight, generatedAt })
+
+        res.json({ insight, provider, generatedAt, cached: false })
 
     } catch (error) {
         const errorId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         console.error(`AI Insight Error [${errorId}]:`, error);
-        res.status(500).json({
-            error: 'Failed to generate insight',
-            errorId
-        });
+        res.status(500).json({ error: 'Failed to generate insight', errorId });
     }
 });
 
