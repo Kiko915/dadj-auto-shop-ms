@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createServiceOrder } from '@/api/serviceOrders'
-import { getCustomer } from '@/api/customers'
+import { getCustomer, searchCustomers } from '@/api/customers'
+import { getCustomerVehicles } from '@/api/vehicles'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,7 @@ import {
 import EstimateItemBuilder from '@/components/views/estimates/EstimateItemBuilder.vue'
 import EstimateCustomerVehicleSelector from '@/components/views/estimates/EstimateCustomerVehicleSelector.vue'
 import EstimateSummary from '@/components/views/estimates/EstimateSummary.vue'
+import VoiceOrderAssistant from '@/components/voice/VoiceOrderAssistant.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -127,6 +129,120 @@ watch(selectedCustomer, (newVal) => {
     }
 })
 
+const bestVehicleMatch = (vehicles, description) => {
+  if (!vehicles.length) return null
+  if (vehicles.length === 1) return vehicles[0]
+
+  const words = description.toLowerCase().split(/\s+/).filter(w => w.length > 1)
+
+  let best = null
+  let bestScore = 0
+
+  for (const v of vehicles) {
+    const make  = v.make?.toLowerCase() || ''
+    const model = v.model?.toLowerCase() || ''
+    const plate = v.licensePlate?.toLowerCase() || ''
+    const year  = v.year?.toString() || ''
+    let score = 0
+
+    for (const word of words) {
+      if (make  && (make.includes(word)  || word.includes(make)))  score += 3
+      if (model && (model.includes(word) || word.includes(model))) score += 3
+      if (plate && plate.includes(word)) score += 5
+      if (year  && year.includes(word))  score += 2
+    }
+
+    if (score > bestScore) { bestScore = score; best = v }
+  }
+
+  return bestScore > 0 ? best : null
+}
+
+const findCustomer = async (fullName) => {
+  // Try full string first (works if name is stored in one field)
+  let results = await searchCustomers(fullName)
+  if (results.length > 0) return results
+
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length < 2) return []
+
+  // Try last name (usually most unique)
+  const lastName = parts.slice(1).join(' ')
+  results = await searchCustomers(lastName)
+  if (results.length > 0) {
+    const firstName = parts[0].toLowerCase()
+    const filtered = results.filter(c =>
+      c.firstName?.toLowerCase().startsWith(firstName) ||
+      firstName.startsWith(c.firstName?.toLowerCase())
+    )
+    return filtered.length > 0 ? filtered : results
+  }
+
+  // Fall back to first name
+  return await searchCustomers(parts[0])
+}
+
+const applyVoiceOrder = async (data) => {
+  if (data.customerName) {
+    try {
+      const results = await findCustomer(data.customerName)
+
+      if (results.length === 0) {
+        toast.warning(`"${data.customerName}" not found — please select manually.`)
+      } else {
+        // Step 1: fetch and set customer
+        const customerRes = await getCustomer(results[0].id)
+        selectedCustomer.value = customerRes.customer
+        toast.success(`Customer: ${customerRes.customer.firstName} ${customerRes.customer.lastName}`)
+
+        // Step 2: fetch vehicles independently (don't block on failure)
+        try {
+          const vehicleRes = await getCustomerVehicles(results[0].id, { pageSize: 100 })
+          const vehicles = Array.isArray(vehicleRes)
+            ? vehicleRes
+            : vehicleRes.vehicles || vehicleRes.items || []
+
+          if (vehicles.length > 0) {
+            const desc = data.vehicleDescription || ''
+            const match = desc.trim()
+              ? bestVehicleMatch(vehicles, desc)
+              : vehicles.length === 1 ? vehicles[0] : null
+
+            if (match) {
+              // Give the selector component time to render vehicles after customer prop change
+              await nextTick()
+              await new Promise(r => setTimeout(r, 1200))
+              selectedVehicleId.value = match.id
+              toast.success(`Vehicle: ${[match.year, match.make, match.model].filter(Boolean).join(' ')}`)
+            } else if (vehicles.length > 1) {
+              toast.info('Multiple vehicles — please select one manually.')
+            }
+          }
+        } catch (e) {
+          console.error('Vehicle match failed:', e)
+          toast.warning('Could not auto-select vehicle — please select manually.')
+        }
+      }
+    } catch (e) {
+      console.error('Voice apply error:', e)
+      toast.error('Failed to find customer.')
+    }
+  }
+
+  if (data.items?.length) {
+    const newItems = data.items.map(item => ({
+      type: item.type || 'PART',
+      name: item.name || '',
+      description: '',
+      quantity: Number(item.quantity) || 1,
+      price: Number(item.price) || 0,
+      inventoryItemId: null,
+    }))
+    items.value.push(...newItems)
+    toast.success(`Added ${newItems.length} item(s) from voice input.`)
+  }
+}
+
 const saveOrder = async () => {
   if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0 || isDiscountExcessive.value) return
 
@@ -168,93 +284,115 @@ const saveOrder = async () => {
 </script>
 
 <template>
-  <div class="container mx-auto p-6 max-w-7xl animate-in fade-in duration-500">
+  <div class="w-full max-w-7xl mx-auto animate-in fade-in duration-500 pb-24 sm:pb-6">
+
     <!-- Header -->
-    <div class="flex items-center justify-between mb-8">
-      <div class="space-y-1">
-        <h1 class="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            New Service Order
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-8">
+      <div class="space-y-0.5">
+        <h1 class="text-xl sm:text-3xl font-bold tracking-tight text-foreground">
+          New Service Order
         </h1>
-        <p class="text-muted-foreground text-sm">Create a new service order directly.</p>
+        <p class="text-muted-foreground text-xs sm:text-sm">Create a new service order directly.</p>
       </div>
-      <div class="flex gap-3">
+      <!-- Desktop action buttons — hidden on mobile (mobile has sticky bar) -->
+      <div class="hidden sm:flex flex-wrap gap-2">
+        <VoiceOrderAssistant @apply="applyVoiceOrder" />
         <Button variant="outline" @click="$router.back()">Cancel</Button>
-        <Button 
-            @click="saveOrder" 
-            :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
-            class="min-w-[140px]"
+        <Button
+          @click="saveOrder"
+          :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
+          class="min-w-[140px]"
         >
           <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-2 animate-spin" />
           <Check v-else class="w-4 h-4 mr-2" />
           Create Order
         </Button>
       </div>
+      <!-- Mobile: voice button only in header -->
+      <div class="flex sm:hidden">
+        <VoiceOrderAssistant @apply="applyVoiceOrder" />
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-    
-      <!-- Left Column: Item Builder (2/3) -->
-      <div class="xl:col-span-2 space-y-6">
-        <EstimateItemBuilder v-model:items="items" title="Service Order Items" />
-      </div>
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-8">
 
-      <!-- Right Column: Summary & Actions (1/3) -->
-      <div class="space-y-6">
-        
+      <!-- Right Column first on mobile (customer must be selected before items) -->
+      <div class="xl:col-span-1 xl:order-2 space-y-4 min-w-0">
+
         <!-- Customer & Vehicle Selector -->
-        <EstimateCustomerVehicleSelector 
-            v-model:customer="selectedCustomer" 
-            v-model:vehicleId="selectedVehicleId" 
+        <EstimateCustomerVehicleSelector
+          v-model:customer="selectedCustomer"
+          v-model:vehicleId="selectedVehicleId"
         />
 
         <!-- Discount Control -->
         <Card class="bg-white shadow-sm border-slate-200">
-            <CardHeader class="pb-3 border-b">
-                <CardTitle class="text-sm font-semibold flex items-center gap-2">
-                    <Tag class="w-4 h-4 text-purple-500" /> Apply Discount
-                </CardTitle>
-            </CardHeader>
-            <CardContent class="pt-4 space-y-4">
-                <div class="space-y-2">
-                     <Label class="text-xs">Discount Amount (₱)</Label>
-                     <Input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        :max="grandTotalBeforeDiscount"
-                        v-model="discount" 
-                        placeholder="0.00" 
-                        :class="{'border-destructive focus-visible:ring-destructive': isDiscountExcessive}"
-                    />
-                    <div v-if="isDiscountExcessive" class="flex items-center gap-1.5 text-xs text-destructive font-medium animate-in fade-in-0 slide-in-from-top-1">
-                        <AlertTriangle class="h-3.5 w-3.5" />
-                        Discount cannot exceed grand total ({{ formatCurrency(grandTotalBeforeDiscount) }}) or be negative.
-                    </div>
-                </div>
-                <div class="space-y-2">
-                     <Label class="text-xs">Reason / Promo Code</Label>
-                     <Input type="text" v-model="discountReason" placeholder="e.g. Senior Citizen, Promo" />
-                </div>
-
-                <div v-if="selectedCustomer?.birthday && discountReason.includes('Birthday')" class="bg-purple-50 text-purple-700 p-2 rounded text-xs flex items-center gap-2">
-                    <Gift class="w-3 h-3" /> Birthday verified: {{ new Date(selectedCustomer.birthday).toLocaleDateString() }}
-                </div>
-            </CardContent>
+          <CardHeader class="pb-3 border-b px-4">
+            <CardTitle class="text-sm font-semibold flex items-center gap-2">
+              <Tag class="w-4 h-4 text-purple-500" /> Apply Discount
+            </CardTitle>
+          </CardHeader>
+          <CardContent class="pt-4 space-y-3 px-4">
+            <div class="space-y-1.5">
+              <Label class="text-xs">Discount Amount (₱)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                :max="grandTotalBeforeDiscount"
+                v-model="discount"
+                placeholder="0.00"
+                :class="{'border-destructive focus-visible:ring-destructive': isDiscountExcessive}"
+              />
+              <div v-if="isDiscountExcessive" class="flex items-center gap-1.5 text-xs text-destructive font-medium animate-in fade-in-0">
+                <AlertTriangle class="h-3.5 w-3.5 shrink-0" />
+                Discount cannot exceed {{ formatCurrency(grandTotalBeforeDiscount) }} or be negative.
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <Label class="text-xs">Reason / Promo Code</Label>
+              <Input type="text" v-model="discountReason" placeholder="e.g. Senior Citizen, Promo" />
+            </div>
+            <div v-if="selectedCustomer?.birthday && discountReason.includes('Birthday')" class="bg-purple-50 text-purple-700 p-2 rounded text-xs flex items-center gap-2">
+              <Gift class="w-3 h-3 shrink-0" /> Birthday verified: {{ new Date(selectedCustomer.birthday).toLocaleDateString() }}
+            </div>
+          </CardContent>
         </Card>
 
         <!-- Totals Summary -->
-        <EstimateSummary 
-            :labor-total="laborTotal"
-            :parts-total="partsTotal"
-            :grand-total="grandTotal"
-            :discount="discount"
-            :discount-reason="discountReason"
-            :items-count="items.length"
-            :show-expiry="false" 
-            title="Order Summary"
+        <EstimateSummary
+          :labor-total="laborTotal"
+          :parts-total="partsTotal"
+          :grand-total="grandTotal"
+          :discount="discount"
+          :discount-reason="discountReason"
+          :items-count="items.length"
+          :show-expiry="false"
+          title="Order Summary"
         />
-
       </div>
+
+      <!-- Left Column: Item Builder -->
+      <div class="xl:col-span-2 xl:order-1 min-w-0">
+        <EstimateItemBuilder v-model:items="items" title="Service Order Items" />
+      </div>
+
     </div>
+
+    <!-- Mobile Sticky Bottom Bar -->
+    <div class="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-background border-t shadow-lg px-4 py-3 flex gap-2">
+      <Button variant="outline" class="flex-1" @click="$router.back()">Cancel</Button>
+      <Button
+        class="flex-1"
+        @click="saveOrder"
+        :disabled="isSubmitting || !selectedCustomer || !selectedVehicleId || items.length === 0 || isDiscountExcessive"
+      >
+        <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-1.5 animate-spin" />
+        <Check v-else class="w-4 h-4 mr-1.5" />
+        Create Order
+      </Button>
+    </div>
+
   </div>
 </template>
