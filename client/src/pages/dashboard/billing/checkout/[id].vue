@@ -178,7 +178,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="h-[calc(100vh-8rem)] relative flex flex-col rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-white"> 
+    <div class="relative flex flex-col rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-white sm:h-[calc(100vh-8rem)]">
         
         <!-- Enhanced Loading State -->
         <div v-if="loading" class="absolute inset-0 z-50 bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -200,7 +200,7 @@ onMounted(() => {
             </div>
         </div>
 
-        <div v-else class="flex h-full"> 
+        <div v-else class="flex flex-col sm:flex-row sm:h-full overflow-y-auto sm:overflow-hidden">
             
             <!-- Left: Invoice Summary -->
             <InvoiceSummary 

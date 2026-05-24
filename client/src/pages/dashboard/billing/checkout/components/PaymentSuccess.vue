@@ -16,18 +16,18 @@ defineEmits(['print-receipt', 'print-gate-pass', 'finish'])
 </script>
 
 <template>
-    <div class="w-1/2 bg-white flex flex-col items-center justify-center h-full p-8 space-y-8 animate-in slide-in-from-right duration-500">
-        <div class="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+    <div class="w-full sm:w-1/2 bg-white flex flex-col items-center justify-center h-full p-6 sm:p-8 space-y-6 sm:space-y-8 animate-in slide-in-from-right duration-500">
+        <div class="h-16 w-16 sm:h-12 sm:w-12 bg-emerald-100 rounded-full flex items-center justify-center">
             <CheckCircle2 class="h-10 w-10 text-emerald-600 animate-in zoom-in duration-500" />
         </div>
-        
-        <div class="text-center space-y-2">
-            <h2 class="text-3xl font-black text-slate-900 tracking-tight">Payment Successful!</h2>
-            <p class="text-slate-500 text-lg">Transaction has been recorded.</p>
+
+        <div class="text-center space-y-1.5">
+            <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Payment Successful!</h2>
+            <p class="text-slate-500 text-base sm:text-lg">Transaction has been recorded.</p>
         </div>
 
         <Card class="w-full max-w-sm border-slate-200 shadow-sm bg-slate-50/50">
-            <CardContent class="p-6 space-y-4">
+            <CardContent class="p-4 sm:p-6 space-y-4">
                 <div class="flex justify-between text-sm">
                     <span class="text-slate-500">Amount Paid</span>
                     <span class="font-bold font-mono text-slate-900">{{ formatCurrency(amountToPay) }}</span>
