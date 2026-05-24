@@ -22,6 +22,7 @@ import EstimateItemBuilder from '@/components/views/estimates/EstimateItemBuilde
 import EstimateCustomerVehicleSelector from '@/components/views/estimates/EstimateCustomerVehicleSelector.vue'
 import EstimateSummary from '@/components/views/estimates/EstimateSummary.vue'
 import VoiceOrderAssistant from '@/components/voice/VoiceOrderAssistant.vue'
+import DiagnosticAdvisor from '@/components/ai/DiagnosticAdvisor.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -243,6 +244,20 @@ const applyVoiceOrder = async (data) => {
   }
 }
 
+const applyDiagnosis = (data) => {
+  if (data.items?.length) {
+    const newItems = data.items.map(item => ({
+      type: item.type || 'LABOR',
+      name: item.name || '',
+      description: item.description || '',
+      quantity: Number(item.quantity) || 1,
+      price: Number(item.price) || 0,
+      inventoryItemId: null,
+    }))
+    items.value.push(...newItems)
+  }
+}
+
 const saveOrder = async () => {
   if (!selectedCustomer.value || !selectedVehicleId.value || items.value.length === 0 || isDiscountExcessive.value) return
 
@@ -296,6 +311,7 @@ const saveOrder = async () => {
       </div>
       <!-- Desktop action buttons — hidden on mobile (mobile has sticky bar) -->
       <div class="hidden sm:flex flex-wrap gap-2">
+        <DiagnosticAdvisor @apply="applyDiagnosis" />
         <VoiceOrderAssistant @apply="applyVoiceOrder" />
         <Button variant="outline" @click="$router.back()">Cancel</Button>
         <Button
@@ -308,8 +324,9 @@ const saveOrder = async () => {
           Create Order
         </Button>
       </div>
-      <!-- Mobile: voice button only in header -->
-      <div class="flex sm:hidden">
+      <!-- Mobile: AI buttons in header -->
+      <div class="flex sm:hidden gap-2">
+        <DiagnosticAdvisor @apply="applyDiagnosis" />
         <VoiceOrderAssistant @apply="applyVoiceOrder" />
       </div>
     </div>
