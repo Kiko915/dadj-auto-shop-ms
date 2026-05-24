@@ -44,11 +44,11 @@ const addBill = (amount) => {
 </script>
 
 <template>
-    <div class="w-1/2 bg-white flex flex-col h-full overflow-y-auto custom-scrollbar">
-        <div class="p-8 pt-12 max-w-xl mx-auto w-full flex flex-col justify-start">
-            
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-slate-900 mb-1">Process Payment</h2>
+    <div class="w-full sm:w-1/2 bg-white flex flex-col h-full overflow-y-auto custom-scrollbar">
+        <div class="p-4 sm:p-8 pt-6 sm:pt-12 max-w-xl mx-auto w-full flex flex-col justify-start pb-24 sm:pb-8">
+
+            <div class="mb-6 sm:mb-8">
+                <h2 class="text-lg sm:text-xl font-bold text-slate-900 mb-1">Process Payment</h2>
                 <p class="text-slate-500 text-sm">Select payment method and enter amount.</p>
             </div>
 
@@ -66,7 +66,7 @@ const addBill = (amount) => {
                             :max="currentBalance"
                             min="0"
                             step="0.01"
-                            class="flex h-16 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pl-10 text-3xl font-bold ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="flex h-14 sm:h-16 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pl-10 text-2xl sm:text-3xl font-bold ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             :class="{'border-red-500 focus-visible:ring-red-500': !isValidAmount}"
                         />
                     </div>
@@ -214,10 +214,11 @@ const addBill = (amount) => {
 
             </div>
 
-            <div class="mt-8">
-                <Button 
-                    size="lg" 
-                    class="w-full h-14 text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all" 
+            <!-- Inline button (desktop) -->
+            <div class="mt-8 hidden sm:block">
+                <Button
+                    size="lg"
+                    class="w-full h-14 text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all"
                     :disabled="!canProcess"
                     @click="$emit('process-payment')"
                 >
@@ -226,6 +227,19 @@ const addBill = (amount) => {
                 </Button>
             </div>
 
+        </div>
+
+        <!-- Sticky button (mobile only) -->
+        <div class="sm:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-100 shadow-[0_-4px_16px_0_rgba(0,0,0,0.06)]">
+            <Button
+                size="lg"
+                class="w-full h-14 text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all"
+                :disabled="!canProcess"
+                @click="$emit('process-payment')"
+            >
+                <Loader2 v-if="isSubmitting" class="w-5 h-5 mr-2 animate-spin" />
+                <span v-else>Process Payment</span>
+            </Button>
         </div>
     </div>
 </template>
