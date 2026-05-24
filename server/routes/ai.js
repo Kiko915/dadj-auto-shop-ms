@@ -154,4 +154,77 @@ Return ONLY this exact JSON shape:
     }
 })
 
+/**
+ * @route POST /api/ai/diagnose
+ * @description Analyze a customer complaint and suggest diagnoses + service items
+ * @access Private
+ */
+router.post('/diagnose', authenticateToken, async (req, res) => {
+    try {
+        const { complaint, vehicleInfo } = req.body
+
+        if (!complaint || typeof complaint !== 'string' || complaint.trim().length === 0) {
+            return res.status(400).json({ error: 'Complaint description is required' })
+        }
+
+        if (!groqClient) {
+            return res.status(503).json({ error: 'AI service unavailable' })
+        }
+
+        const vehicleContext = vehicleInfo ? `Vehicle: ${vehicleInfo.trim()}` : 'Vehicle: unknown'
+
+        const completion = await groqClient.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are an expert automotive technician and service advisor for a repair shop in the Philippines.
+A customer has described a problem with their vehicle. Analyze the symptoms and return ONLY valid JSON — no explanation, no markdown, no code block.
+
+Rules:
+- diagnoses: up to 3 most likely root causes, ordered from most to least probable.
+  - issue: short name of the problem (e.g. "Worn brake pads")
+  - confidence: "high", "medium", or "low"
+  - explanation: 1–2 sentences explaining why this matches the symptoms
+- items: recommended service items to fix or investigate the issue.
+  - type: "LABOR" for services/inspections, "PART" for physical components
+  - name: specific service or part name
+  - description: brief detail (e.g. "Front and rear" or "Per hour")
+  - quantity: realistic number (hours for labor, units for parts)
+  - price: estimated price in PHP based on typical Philippine auto shop rates
+
+Return ONLY this exact JSON shape:
+{
+  "diagnoses": [
+    { "issue": "", "confidence": "high", "explanation": "" }
+  ],
+  "items": [
+    { "type": "LABOR", "name": "", "description": "", "quantity": 1, "price": 0 },
+    { "type": "PART",  "name": "", "description": "", "quantity": 1, "price": 0 }
+  ]
+}`
+                },
+                {
+                    role: 'user',
+                    content: `${vehicleContext}\nCustomer complaint: ${complaint.trim()}`
+                }
+            ],
+            temperature: 0.2,
+            response_format: { type: 'json_object' },
+        })
+
+        const text = completion.choices[0]?.message?.content || '{}'
+        const result = JSON.parse(text)
+
+        res.json({ result })
+
+    } catch (error) {
+        console.error('Diagnose Error:', error)
+        if (error instanceof SyntaxError) {
+            return res.status(422).json({ error: 'AI returned unparseable response. Try again.' })
+        }
+        res.status(500).json({ error: 'Failed to analyze complaint' })
+    }
+})
+
 export default router;
