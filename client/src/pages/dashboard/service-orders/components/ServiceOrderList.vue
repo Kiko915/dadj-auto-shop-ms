@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { MoreHorizontal, Eye, Wrench, Calendar, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { MoreHorizontal, Eye, Wrench, Calendar, AlertTriangle, ChevronLeft, ChevronRight, User } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -40,8 +40,87 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex-1 rounded-md border bg-card overflow-hidden">
+  <div class="space-y-3 flex-1 min-h-0 overflow-y-auto">
+
+    <!-- Mobile: Card List -->
+    <div class="sm:hidden space-y-2">
+      <!-- Loading -->
+      <div v-if="loading && orders.length === 0" class="flex justify-center py-10">
+        <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+      </div>
+
+      <!-- Empty -->
+      <div v-else-if="orders.length === 0" class="flex flex-col items-center justify-center py-16 space-y-3 text-center">
+        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
+          <Wrench class="h-7 w-7 text-muted-foreground" />
+        </div>
+        <div>
+          <p class="font-semibold">No service orders found</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Approved estimates will appear here.</p>
+        </div>
+      </div>
+
+      <!-- Cards -->
+      <div
+        v-else
+        v-for="order in orders"
+        :key="order.id"
+        class="border rounded-lg bg-card p-3 shadow-sm space-y-2.5"
+        @click="$emit('select-order', order.id)"
+      >
+        <!-- Top row: customer + status -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <Avatar class="h-8 w-8 border border-slate-200 shrink-0">
+              <AvatarImage v-if="order.customer.profilePicture" :src="order.customer.profilePicture" />
+              <AvatarFallback class="bg-primary/10 text-primary text-xs font-medium">
+                {{ getInitials(order.customer.firstName + ' ' + order.customer.lastName) }}
+              </AvatarFallback>
+            </Avatar>
+            <span class="font-medium text-sm truncate">{{ order.customer.firstName }} {{ order.customer.lastName }}</span>
+          </div>
+          <Badge :variant="getStatusVariant(order.status)" class="rounded-full px-2 text-[11px] font-normal shrink-0">
+            {{ formatStatus(order.status) }}
+          </Badge>
+        </div>
+
+        <!-- Vehicle -->
+        <div class="flex items-center gap-2">
+          <div class="font-semibold text-sm text-slate-700">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
+          <div class="text-xs text-muted-foreground font-mono bg-slate-100 px-1.5 py-0.5 rounded">{{ order.vehicle.licensePlate }}</div>
+        </div>
+
+        <!-- Bottom row: due date + mechanic + action -->
+        <div class="flex items-center justify-between border-t pt-2 mt-1">
+          <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar class="h-3 w-3 shrink-0" :class="{
+              'text-amber-500': isDueToday(order.estimatedCompletion),
+              'text-red-500': isOverdue(order.estimatedCompletion) && order.status !== 'COMPLETED' && order.status !== 'CANCELLED'
+            }" />
+            <span :class="{
+              'text-amber-600 font-medium': isDueToday(order.estimatedCompletion),
+              'text-red-600 font-medium': isOverdue(order.estimatedCompletion) && order.status !== 'COMPLETED' && order.status !== 'CANCELLED'
+            }">
+              {{ order.estimatedCompletion ? formatDate(order.estimatedCompletion) : formatDate(order.createdAt) }}
+            </span>
+            <Badge v-if="isDueToday(order.estimatedCompletion)" variant="outline" class="text-[10px] h-4 px-1 bg-amber-50 text-amber-600 border-amber-200">Today</Badge>
+            <Badge v-else-if="isOverdue(order.estimatedCompletion) && order.status !== 'COMPLETED' && order.status !== 'CANCELLED'" variant="outline" class="text-[10px] h-4 px-1 bg-red-50 text-red-600 border-red-200">Overdue</Badge>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <Avatar class="h-5 w-5 border border-slate-200 shrink-0">
+              <AvatarImage v-if="order.mechanic?.profilePicture" :src="order.mechanic.profilePicture" />
+              <AvatarFallback class="bg-blue-100 text-blue-700 text-[9px]">
+                {{ order.mechanic ? getInitials(order.mechanic.name) : '?' }}
+              </AvatarFallback>
+            </Avatar>
+            <span class="text-xs text-muted-foreground truncate max-w-[80px]">{{ order.mechanic?.name ?? 'Unassigned' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop: Table -->
+    <div class="hidden sm:block rounded-md border bg-card overflow-hidden">
         <div class="h-full overflow-y-auto">
             <Table>
                 <TableHeader>
@@ -64,7 +143,7 @@ const router = useRouter()
                     </div>
                     </TableCell>
                 </TableRow>
-                
+
                 <TableRow v-else-if="orders.length === 0">
                     <TableCell colspan="8" class="h-[400px] text-center">
                     <div class="flex flex-col items-center justify-center space-y-3">
@@ -81,9 +160,9 @@ const router = useRouter()
                     </TableCell>
                 </TableRow>
 
-                <TableRow 
-                    v-else 
-                    v-for="order in orders" 
+                <TableRow
+                    v-else
+                    v-for="order in orders"
                     :key="order.id"
                     class="group hover:bg-muted/50 transition-colors"
                 >
@@ -189,7 +268,7 @@ const router = useRouter()
             </Table>
         </div>
     </div>
-    
+
     <!-- Pagination -->
     <div class="flex items-center justify-end gap-2">
       <Button

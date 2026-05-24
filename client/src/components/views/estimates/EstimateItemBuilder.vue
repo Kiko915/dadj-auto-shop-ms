@@ -180,10 +180,10 @@ const removeItem = (index) => {
         <CardContent class="space-y-6">
         
         <!-- Builder Interactions -->
-        <div class="p-5 bg-muted/30 rounded-xl border border-dashed border-primary/20 space-y-4">
-            <div class="grid grid-cols-12 gap-4 items-end">
+        <div class="p-4 sm:p-5 bg-muted/30 rounded-xl border border-dashed border-primary/20 space-y-4">
+            <div class="grid grid-cols-12 gap-3 items-end">
                 <!-- Type -->
-                <div class="col-span-3 sm:col-span-2">
+                <div class="col-span-4 sm:col-span-2">
                     <Label class="text-xs font-semibold mb-2 block text-muted-foreground uppercase tracking-wider">Type</Label>
                     <Select v-model="newItem.type">
                         <SelectTrigger class="bg-background">
@@ -197,7 +197,7 @@ const removeItem = (index) => {
                 </div>
 
                 <!-- Name / Search -->
-                <div class="col-span-9 sm:col-span-6 relative">
+                <div class="col-span-8 sm:col-span-6 relative">
                     <Label class="text-xs font-semibold mb-2 block text-muted-foreground uppercase tracking-wider">Item / Service</Label>
                     <div class="relative">
                         <Search v-if="newItem.type === 'PART'" class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -281,8 +281,43 @@ const removeItem = (index) => {
                 </div>
         </div>
 
-        <!-- Items Table -->
-        <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+        <!-- Empty state -->
+        <div v-if="items.length === 0" class="border rounded-lg bg-muted/5 py-12 text-center text-muted-foreground">
+            <div class="flex flex-col items-center justify-center gap-2">
+                <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
+                    <FileText class="w-6 h-6 text-muted-foreground/50" />
+                </div>
+                <p class="font-medium">No items added</p>
+                <p class="text-xs">Use the builder above to add parts or labor.</p>
+            </div>
+        </div>
+
+        <!-- Mobile: card list -->
+        <div v-else class="sm:hidden space-y-2">
+            <div v-for="(item, index) in items" :key="index"
+                class="border rounded-lg p-3 bg-white shadow-sm flex gap-3 items-start">
+                <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" :class="item.type === 'PART' ? 'border-blue-200 text-blue-700 bg-blue-50' : 'border-amber-200 text-amber-700 bg-amber-50'">
+                            {{ item.type }}
+                        </Badge>
+                        <span class="font-medium text-sm truncate">{{ item.name }}</span>
+                    </div>
+                    <div v-if="item.description" class="text-xs text-muted-foreground truncate">{{ item.description }}</div>
+                    <div class="flex items-center gap-3 text-xs text-muted-foreground pt-0.5">
+                        <span>× {{ item.quantity }}</span>
+                        <span>₱{{ item.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) }} each</span>
+                        <span class="font-semibold text-foreground ml-auto">₱{{ (item.price * item.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+                    </div>
+                </div>
+                <button @click="removeItem(index)" class="group p-1.5 rounded-full hover:bg-destructive/10 transition-colors shrink-0 mt-0.5">
+                    <Trash2 class="w-4 h-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+                </button>
+            </div>
+        </div>
+
+        <!-- Desktop: table -->
+        <div v-if="items.length > 0" class="hidden sm:block border rounded-lg overflow-hidden bg-white shadow-sm">
             <table class="w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-semibold border-b">
                     <tr>
@@ -295,17 +330,6 @@ const removeItem = (index) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y">
-                    <tr v-if="items.length === 0">
-                        <td colspan="6" class="px-6 py-12 text-center text-muted-foreground bg-muted/5">
-                            <div class="flex flex-col items-center justify-center gap-2">
-                                <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
-                                    <FileText class="w-6 h-6 text-muted-foreground/50" />
-                                </div>
-                                <p class="font-medium">No items added</p>
-                                <p class="text-xs">Use the builder above to add parts or labor.</p>
-                            </div>
-                        </td>
-                    </tr>
                     <tr v-for="(item, index) in items" :key="index" class="hover:bg-muted/30 transition-colors">
                         <td class="px-6 py-4">
                             <Badge variant="outline" :class="item.type === 'PART' ? 'border-blue-200 text-blue-700 bg-blue-50' : 'border-amber-200 text-amber-700 bg-amber-50'">
@@ -313,9 +337,7 @@ const removeItem = (index) => {
                             </Badge>
                         </td>
                         <td class="px-6 py-4">
-                            <div class="font-medium flex items-center gap-2">
-                                {{ item.name }}
-                            </div>
+                            <div class="font-medium">{{ item.name }}</div>
                             <div v-if="item.description" class="text-xs text-muted-foreground mt-0.5 max-w-[250px] truncate">{{ item.description }}</div>
                         </td>
                         <td class="px-6 py-4 text-center font-medium">{{ item.quantity }}</td>

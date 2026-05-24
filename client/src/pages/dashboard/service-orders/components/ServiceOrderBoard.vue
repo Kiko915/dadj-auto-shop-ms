@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, ref } from 'vue'
+import { watch, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDragAndDrop } from '@formkit/drag-and-drop/vue'
 import { animations } from '@formkit/drag-and-drop'
@@ -102,10 +102,16 @@ const handleDragEnd = async (event: any, targetStatus: string) => {
 const handleCardClick = (id: string) => {
     emit('select-order', id)
 }
+
+const isTouchDevice = ref(false)
+onMounted(() => {
+    isTouchDevice.value = window.matchMedia('(pointer: coarse)').matches
+})
 </script>
 
 <template>
-    <div class="flex h-full min-w-full lg:w-full gap-4 px-1">
+    <div class="overflow-x-auto h-full">
+    <div class="flex h-full gap-4 px-1 min-w-max">
         
         <!-- Pending Column -->
         <div class="flex h-full w-72 shrink-0 md:w-auto md:flex-1 flex-col rounded-lg border bg-slate-50/50 shadow-sm" >
@@ -156,7 +162,7 @@ const handleCardClick = (id: string) => {
                             <span v-if="isDueToday(order.estimatedCompletion)" class="flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                         </div>
                         
-                        <TooltipProvider>
+                        <TooltipProvider v-if="!isTouchDevice">
                             <Tooltip>
                                 <TooltipTrigger>
                                     <Avatar class="h-6 w-6 border-2 border-white shadow-sm">
@@ -172,6 +178,13 @@ const handleCardClick = (id: string) => {
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+                        <Avatar v-else class="h-6 w-6 border-2 border-white shadow-sm">
+                            <AvatarImage v-if="order.mechanic?.profilePicture || order.mechanic?.avatar" :src="order.mechanic?.profilePicture || order.mechanic?.avatar" />
+                            <AvatarFallback :class="order.mechanic ? 'bg-primary/10 text-primary' : 'bg-slate-100 border-dashed text-slate-400'">
+                                <span v-if="order.mechanic" class="text-[10px]">{{ getInitials(order.mechanic.name) }}</span>
+                                <Wrench v-else class="h-3 w-3" />
+                            </AvatarFallback>
+                        </Avatar>
                     </div>
                 </div>
             </div>
@@ -316,5 +329,6 @@ const handleCardClick = (id: string) => {
             </div>
         </div>
 
+    </div>
     </div>
 </template>

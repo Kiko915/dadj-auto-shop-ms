@@ -32,6 +32,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "form-data": "^4.0.5",
+    "groq-sdk": "^1.1.2",
     "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "mailgun.js": "^12.4.0",

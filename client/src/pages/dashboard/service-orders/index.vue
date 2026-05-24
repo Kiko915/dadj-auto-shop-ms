@@ -142,116 +142,105 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-[calc(100vh-6rem)] flex flex-col space-y-4">
+  <div class="h-[calc(100vh-6rem)] flex flex-col space-y-3">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">Service Orders</h1>
-        <p class="text-muted-foreground">Manage active jobs and service workflow.</p>
+    <div class="flex items-center justify-between gap-2 shrink-0">
+      <div class="min-w-0">
+        <h1 class="text-xl sm:text-3xl font-bold tracking-tight truncate">Service Orders</h1>
+        <p class="text-muted-foreground text-xs sm:text-sm hidden sm:block">Manage active jobs and service workflow.</p>
       </div>
-      <div class="flex items-center gap-2">
-         <Button variant="outline" size="icon" @click="fetchData()" :disabled="loading">
-            <RefreshCw class="h-4 w-4" :class="{'animate-spin': loading}" />
-         </Button>
-         <Button @click="router.push({ name: 'new-service-order' })">
-            <Plus class="mr-2 h-4 w-4" />
-            Create Direct Order
-          </Button>
+      <div class="flex items-center gap-2 shrink-0">
+        <Button variant="outline" size="icon" @click="fetchData()" :disabled="loading">
+          <RefreshCw class="h-4 w-4" :class="{'animate-spin': loading}" />
+        </Button>
+        <Button @click="router.push({ name: 'new-service-order' })">
+          <Plus class="h-4 w-4 sm:mr-2" />
+          <span class="hidden sm:inline">Create Direct Order</span>
+        </Button>
       </div>
     </div>
 
     <!-- Controls -->
-    <div class="flex flex-col sm:flex-row gap-4 items-center justify-between shrink-0">
-      <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-        
+    <div class="flex flex-col gap-2 shrink-0">
+      <!-- Row 1: view toggle + search -->
+      <div class="flex items-center gap-2">
         <!-- View Toggle -->
         <div class="flex items-center rounded-lg border bg-muted p-1 h-9 shrink-0">
-            <button 
-                @click="viewMode = 'BOARD'"
-                class="flex items-center gap-2 px-3 py-1 text-sm font-medium rounded-md transition-all"
-                :class="viewMode === 'BOARD' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'"
-            >
-                <LayoutGrid class="h-4 w-4" />
-                <span class="hidden sm:inline">Board</span>
-            </button>
-            <button 
-                @click="viewMode = 'LIST'"
-                class="flex items-center gap-2 px-3 py-1 text-sm font-medium rounded-md transition-all"
-                :class="viewMode === 'LIST' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'"
-            >
-                <List class="h-4 w-4" />
-                <span class="hidden sm:inline">List</span>
-            </button>
+          <button
+            @click="viewMode = 'BOARD'"
+            class="flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-md transition-all"
+            :class="viewMode === 'BOARD' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'"
+          >
+            <LayoutGrid class="h-4 w-4" />
+            <span class="hidden sm:inline">Board</span>
+          </button>
+          <button
+            @click="viewMode = 'LIST'"
+            class="flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-md transition-all"
+            :class="viewMode === 'LIST' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'"
+          >
+            <List class="h-4 w-4" />
+            <span class="hidden sm:inline">List</span>
+          </button>
         </div>
 
-        <div class="h-6 w-px bg-border hidden sm:block shrink-0"></div>
-
-        <div class="relative w-full sm:w-64 shrink-0">
+        <div class="relative flex-1">
           <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            v-model="search" 
-            placeholder="Search vehicle or customer..." 
-            class="pl-8"
-          />
+          <Input v-model="search" placeholder="Search vehicle or customer..." class="pl-8 w-full" />
         </div>
-        
-        <!-- Filters -->
-         <div class="flex items-center gap-2">
-             <!-- Status Filter -->
-             <Select v-model="statusFilter">
-                <SelectTrigger class="h-9 border-dashed rounded-md px-3 text-xs sm:text-sm gap-2">
-                    <CircleDashed class="h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="ALL">All Status</SelectItem>
-                    <SelectItem value="PENDING">Pending</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                    <SelectItem value="COMPLETED">Completed</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                </SelectContent>
-             </Select>
+      </div>
 
-             <!-- Mechanic Filter -->
-             <Select v-model="mechanicFilter">
-                <SelectTrigger class="h-9 border-dashed rounded-md px-3 text-xs sm:text-sm gap-2 min-w-[140px]">
-                    <User class="h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Assigned to" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="ALL">All Mechanics</SelectItem>
-                    <SelectItem value="Unassigned">Unassigned</SelectItem>
-                    <template v-for="mech in availableMechanics" :key="mech.id">
-                         <SelectItem :value="mech.name">{{ mech.name }}</SelectItem>
-                    </template>
-                </SelectContent>
-            </Select>
+      <!-- Row 2: filters -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1">
+        <Select v-model="statusFilter">
+          <SelectTrigger class="h-8 border-dashed rounded-md px-2.5 text-xs gap-1.5 shrink-0 min-w-[110px]">
+            <CircleDashed class="h-3.5 w-3.5 text-muted-foreground" />
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Status</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
 
-            <!-- Due Date Filter -->
-            <Select v-model="dateFilter">
-                <SelectTrigger class="h-9 border-dashed rounded-md px-3 text-xs sm:text-sm gap-2">
-                    <Calendar class="h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Due Date" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="ALL">Any Date</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="today">Due Today</SelectItem>
-                    <SelectItem value="week">Due This Week</SelectItem>
-                </SelectContent>
-            </Select>
+        <Select v-model="mechanicFilter">
+          <SelectTrigger class="h-8 border-dashed rounded-md px-2.5 text-xs gap-1.5 shrink-0 min-w-[120px]">
+            <User class="h-3.5 w-3.5 text-muted-foreground" />
+            <SelectValue placeholder="Mechanic" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Mechanics</SelectItem>
+            <SelectItem value="Unassigned">Unassigned</SelectItem>
+            <template v-for="mech in availableMechanics" :key="mech.id">
+              <SelectItem :value="mech.name">{{ mech.name }}</SelectItem>
+            </template>
+          </SelectContent>
+        </Select>
 
-             <Button 
-                v-if="mechanicFilter !== 'ALL' || statusFilter !== 'ALL' || dateFilter !== 'ALL'"
-                variant="ghost" 
-                size="sm"
-                class="h-9 px-2 text-muted-foreground hover:text-foreground"
-                @click="mechanicFilter = 'ALL'; statusFilter = 'ALL'; dateFilter = 'ALL'"
-             >
-                Reset
-             </Button>
-         </div>
+        <Select v-model="dateFilter">
+          <SelectTrigger class="h-8 border-dashed rounded-md px-2.5 text-xs gap-1.5 shrink-0 min-w-[110px]">
+            <Calendar class="h-3.5 w-3.5 text-muted-foreground" />
+            <SelectValue placeholder="Due Date" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Any Date</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="today">Due Today</SelectItem>
+            <SelectItem value="week">Due This Week</SelectItem>
+          </SelectContent>
+        </Select>
 
+        <Button
+          v-if="mechanicFilter !== 'ALL' || statusFilter !== 'ALL' || dateFilter !== 'ALL'"
+          variant="ghost" size="sm"
+          class="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
+          @click="mechanicFilter = 'ALL'; statusFilter = 'ALL'; dateFilter = 'ALL'"
+        >
+          Reset
+        </Button>
       </div>
     </div>
 

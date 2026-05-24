@@ -1,12 +1,17 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null
+console.log('[AI] Groq client:', groqClient ? 'READY' : 'NOT READY');
 
-// Initialize Gemini
-// Ensure GEMINI_API_KEY is in your .env file
-// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
+// Log every request that hits this router
+router.use((req, res, next) => {
+  console.log(`[AI router] ${req.method} ${req.path} | auth header: ${req.headers.authorization ? 'present' : 'MISSING'}`)
+  next()
+})
 
 /**
  * @route POST /api/ai/insight
@@ -80,5 +85,73 @@ router.post('/insight', authenticateToken, async (req, res) => {
         });
     }
 });
+
+/**
+ * @route POST /api/ai/parse-order
+ * @description Extract structured service order data from a voice transcript using Groq
+ * @access Private
+ */
+router.post('/parse-order', authenticateToken, async (req, res) => {
+    try {
+        const { transcript } = req.body
+
+        if (!transcript || typeof transcript !== 'string' || transcript.trim().length === 0) {
+            return res.status(400).json({ error: 'Transcript is required' })
+        }
+
+        console.log('[parse-order] hit, groqClient:', groqClient ? 'ready' : 'null')
+        if (!groqClient) {
+            return res.status(503).json({ error: 'AI service unavailable' })
+        }
+
+        const groq = groqClient
+
+        const completion = await groq.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are a service order parser for a Philippine automotive repair shop.
+Extract information from the user's voice transcript and return ONLY valid JSON — no explanation, no markdown, no code block.
+
+Rules:
+- customerName: full name of the customer. Empty string if not mentioned.
+- vehicleDescription: vehicle make, model, and year if mentioned. Empty string if not mentioned.
+- items: array of parts and labor. Use type "PART" for physical parts, "LABOR" for work/service.
+- quantity: number (default 1 if not specified). For LABOR, quantity = hours if mentioned.
+- price: number in PHP (default 0 if not mentioned).
+
+Return ONLY this exact JSON shape:
+{
+  "customerName": "",
+  "vehicleDescription": "",
+  "items": [
+    { "type": "PART", "name": "", "quantity": 1, "price": 0 },
+    { "type": "LABOR", "name": "", "quantity": 1, "price": 0 }
+  ]
+}`
+                },
+                {
+                    role: 'user',
+                    content: transcript.trim()
+                }
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+        })
+
+        const text = completion.choices[0]?.message?.content || '{}'
+        const parsed = JSON.parse(text)
+
+        res.json({ parsed })
+
+    } catch (error) {
+        console.error('Parse Order Error:', error)
+        if (error instanceof SyntaxError) {
+            return res.status(422).json({ error: 'AI returned unparseable response. Try again.' })
+        }
+        res.status(500).json({ error: 'Failed to parse voice order' })
+    }
+})
 
 export default router;
